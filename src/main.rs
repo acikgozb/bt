@@ -1,3 +1,8 @@
+use bt::api::Cli;
+use clap::Parser;
+
 fn main() {
-    println!("Hello, world!");
+    let args = Cli::parse();
+
+    println!("{:?}", args);
 }
