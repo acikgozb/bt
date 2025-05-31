@@ -20,7 +20,7 @@ fn run() -> Result<(), Box<dyn error::Error>> {
     if let Some(subcommand) = args.command {
         match subcommand {
             BtCommand::Status => bt::status(&mut stdout),
-            BtCommand::Toggle => todo!(),
+            BtCommand::Toggle => bt::toggle(&mut stdout),
             BtCommand::Scan { args } => todo!(),
             BtCommand::Connect { args } => todo!(),
             BtCommand::Disconnect { force } => todo!(),

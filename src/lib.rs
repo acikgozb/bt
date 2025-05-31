@@ -17,6 +17,9 @@ use zbus::zvariant::OwnedObjectPath;
 pub trait BluezAdapter {
     #[zbus(property, name = "PowerState")]
     fn power_state(&self) -> zbus::Result<String>;
+
+    #[zbus(property)]
+    fn set_powered(&self, power_state: bool) -> zbus::Result<()>;
 }
 
 #[proxy(
@@ -68,6 +71,26 @@ impl From<String> for BluezPowerState {
             BluezPowerState::On
         } else {
             BluezPowerState::Off
+        }
+    }
+}
+
+impl std::ops::Not for BluezPowerState {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            BluezPowerState::On => Self::Off,
+            BluezPowerState::Off => Self::On,
+        }
+    }
+}
+
+impl From<&BluezPowerState> for bool {
+    fn from(value: &BluezPowerState) -> Self {
+        match value {
+            BluezPowerState::On => true,
+            BluezPowerState::Off => false,
         }
     }
 }
@@ -137,6 +160,16 @@ impl Bluez {
         Ok(result)
     }
 
+    pub fn toggle_power_state(&self) -> zbus::Result<BluezPowerState> {
+        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
+        let prev_state = adapter_proxy.power_state().map(BluezPowerState::from)?;
+
+        let new_state = !prev_state;
+        adapter_proxy.set_powered(bool::from(&new_state))?;
+
+        Ok(new_state)
+    }
+
     pub fn connected_devs(&self) -> zbus::Result<Vec<BluezConnectedDev>> {
         let dev_paths = self.get_dev_object_paths()?;
 
@@ -184,6 +217,16 @@ pub fn status(f: &mut impl io::Write) -> Result<(), Box<dyn error::Error>> {
         buf.push_str(&dev.to_string())
     }
 
+    f.write_all(buf.as_bytes())?;
+
+    Ok(())
+}
+
+pub fn toggle(f: &mut impl io::Write) -> Result<(), Box<dyn error::Error>> {
+    let bluez = Bluez::new()?;
+    let toggled_power_state = bluez.toggle_power_state()?;
+
+    let buf = format!("bluetooth: {}", toggled_power_state);
     f.write_all(buf.as_bytes())?;
 
     Ok(())
