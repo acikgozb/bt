@@ -1,8 +1,33 @@
-use bt::api::Cli;
+use std::{error, io, process::ExitCode};
+
+use bt::api::{BtCommand, Cli};
 use clap::Parser;
 
-fn main() {
+fn main() -> ExitCode {
+    match run() {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(_) => ExitCode::FAILURE,
+    }
+}
+
+fn run() -> Result<(), Box<dyn error::Error>> {
     let args = Cli::parse();
 
     println!("{:?}", args);
+
+    let mut stdout = io::stdout();
+
+    if let Some(subcommand) = args.command {
+        match subcommand {
+            BtCommand::Status => bt::status(&mut stdout),
+            BtCommand::Toggle => todo!(),
+            BtCommand::Scan { args } => todo!(),
+            BtCommand::Connect { args } => todo!(),
+            BtCommand::Disconnect { force } => todo!(),
+        }
+    } else {
+        bt::status(&mut stdout)
+    }?;
+
+    Ok(())
 }

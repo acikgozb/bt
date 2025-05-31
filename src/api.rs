@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand, arg, command};
 #[command(version, about, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
-    command: Option<BtCommand>,
+    pub command: Option<BtCommand>,
 }
 
 #[derive(Debug, Subcommand)]
