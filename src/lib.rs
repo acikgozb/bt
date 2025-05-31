@@ -117,18 +117,21 @@ impl Bluez {
         Ok(dev_paths)
     }
 
-    fn get_device_proxy<'a>(&'a self, path: &'a str) -> zbus::Result<BluezDeviceProxy<'a>> {
-        let proxy = BluezDeviceProxy::builder(&self.connection).path(path)?;
-        proxy.build()
-    }
+    fn build_proxy<'a, T>(&self, path: Option<&'a str>) -> zbus::Result<T>
+    where
+        T: zbus::blocking::proxy::ProxyImpl<'a> + From<zbus::Proxy<'a>>,
+    {
+        let mut proxy_builder = T::builder(&self.connection);
 
-    fn get_battery_proxy<'a>(&'a self, path: &'a str) -> zbus::Result<BluezDeviceBatteryProxy<'a>> {
-        let proxy = BluezDeviceBatteryProxy::builder(&self.connection).path(path)?;
-        proxy.build()
+        if let Some(path) = path {
+            proxy_builder = proxy_builder.path(path)?;
+        }
+
+        proxy_builder.build()
     }
 
     pub fn power_state(&self) -> zbus::Result<BluezPowerState> {
-        let adapter_proxy = BluezAdapterProxy::new(&self.connection)?;
+        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
         let result = adapter_proxy.power_state().map(BluezPowerState::from)?;
 
         Ok(result)
@@ -140,14 +143,15 @@ impl Bluez {
         Ok(dev_paths
             .into_iter()
             .filter_map(|dev_path| {
-                let dev_proxy = self.get_device_proxy(&dev_path).ok()?;
+                let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path)).ok()?;
 
                 let is_connected = dev_proxy.connected().ok()?;
                 if !is_connected {
                     return None;
                 }
 
-                let battery_proxy = self.get_battery_proxy(&dev_path).ok()?;
+                let battery_proxy: BluezDeviceBatteryProxy =
+                    self.build_proxy(Some(&dev_path)).ok()?;
 
                 let address = dev_proxy.address().ok()?;
                 let alias = dev_proxy.alias().ok()?;
