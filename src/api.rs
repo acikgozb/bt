@@ -1,5 +1,7 @@
 use clap::{Args, Parser, Subcommand, arg, command};
 
+use crate::{BtListingKey, BtListingStatusKey};
+
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
@@ -16,6 +18,21 @@ pub enum BtCommand {
     /// Toggle Bluetooth status.
     #[clap(visible_alias = "t")]
     Toggle,
+
+    #[clap(visible_alias = "ls")]
+    ListDevices {
+        /// Filter the table output based on given keys.
+        #[arg(short, long, value_delimiter = ',')]
+        columns: Option<Vec<BtListingKey>>,
+
+        /// Filter the terse output based on given keys.
+        #[arg(short, long, value_delimiter = ',')]
+        values: Option<Vec<BtListingKey>>,
+
+        /// Filter output based on device status.
+        #[arg(short, long)]
+        status: Option<BtListingStatusKey>,
+    },
 
     /// Scan available devices.
     #[clap(visible_alias = "sc")]

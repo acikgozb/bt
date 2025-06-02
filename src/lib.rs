@@ -231,3 +231,22 @@ pub fn toggle(f: &mut impl io::Write) -> Result<(), Box<dyn error::Error>> {
 
     Ok(())
 }
+// TODO: Move this under API crate.
+#[derive(Copy, Clone, Debug, clap::ValueEnum)]
+pub enum BtListingKey {
+    Alias,
+    Address,
+    Connected,
+    Trusted,
+    Bonded,
+    Paired,
+}
+
+#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+pub enum BtListingStatusKey {
+    Connected,
+    Trusted,
+    Bonded,
+    Paired,
+}
+
