@@ -34,6 +34,15 @@ pub trait BluezDevice {
     fn connected(&self) -> zbus::Result<bool>;
 
     #[zbus(property)]
+    fn bonded(&self) -> zbus::Result<bool>;
+
+    #[zbus(property)]
+    fn paired(&self) -> zbus::Result<bool>;
+
+    #[zbus(property)]
+    fn trusted(&self) -> zbus::Result<bool>;
+
+    #[zbus(property)]
     fn alias(&self) -> zbus::Result<String>;
 
     #[zbus(property)]
@@ -96,20 +105,14 @@ impl From<&BluezPowerState> for bool {
 }
 
 #[derive(Debug)]
-pub struct BluezConnectedDev {
+pub struct BluezDev {
     alias: String,
     address: String,
-    battery: u8,
-}
-
-impl fmt::Display for BluezConnectedDev {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}/{} (battery: %{})",
-            self.alias, self.address, self.battery
-        )
-    }
+    connected: bool,
+    paired: bool,
+    trusted: bool,
+    bonded: bool,
+    battery: Option<u8>,
 }
 
 pub struct Bluez {
@@ -170,7 +173,7 @@ impl Bluez {
         Ok(new_state)
     }
 
-    pub fn connected_devs(&self) -> zbus::Result<Vec<BluezConnectedDev>> {
+    pub fn devs(&self) -> zbus::Result<Vec<BluezDev>> {
         let dev_paths = self.get_dev_object_paths()?;
 
         Ok(dev_paths
@@ -178,25 +181,33 @@ impl Bluez {
             .filter_map(|dev_path| {
                 let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path)).ok()?;
 
-                let is_connected = dev_proxy.connected().ok()?;
-                if !is_connected {
-                    return None;
+                let mut dev = BluezDev {
+                    alias: dev_proxy.alias().ok()?,
+                    address: dev_proxy.address().ok()?,
+                    connected: dev_proxy.connected().ok()?,
+                    paired: dev_proxy.paired().ok()?,
+                    trusted: dev_proxy.trusted().ok()?,
+                    bonded: dev_proxy.bonded().ok()?,
+                    battery: None,
+                };
+
+                if !dev.connected {
+                    return Some(dev);
                 }
 
                 let battery_proxy: BluezDeviceBatteryProxy =
                     self.build_proxy(Some(&dev_path)).ok()?;
+                dev.battery = Some(battery_proxy.percentage().ok()?);
 
-                let address = dev_proxy.address().ok()?;
-                let alias = dev_proxy.alias().ok()?;
-                let battery = battery_proxy.percentage().ok()?;
-
-                Some(BluezConnectedDev {
-                    alias,
-                    address,
-                    battery,
-                })
+                Some(dev)
             })
-            .collect::<Vec<BluezConnectedDev>>())
+            .collect::<Vec<BluezDev>>())
+    }
+
+    pub fn connected_devs(&self) -> zbus::Result<Vec<BluezDev>> {
+        let devs = self.devs()?;
+
+        Ok(devs.into_iter().filter(|d| d.connected).collect())
     }
 }
 
@@ -213,8 +224,13 @@ pub fn status(f: &mut impl io::Write) -> Result<(), Box<dyn error::Error>> {
     ]
     .join("");
     for dev in connected_devs {
-        buf.push('\n');
-        buf.push_str(&dev.to_string())
+        let format = format!(
+            "\n{}/{} (batt: %{})",
+            dev.alias,
+            dev.address,
+            dev.battery.unwrap()
+        );
+        buf.push_str(&format)
     }
 
     f.write_all(buf.as_bytes())?;
