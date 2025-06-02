@@ -1,6 +1,9 @@
 pub mod api;
 
+use std::fmt::Debug;
 use std::{error, fmt, io};
+use tabled::builder::Builder;
+use tabled::settings::Style;
 use zbus::blocking::Connection;
 use zbus::blocking::fdo::ObjectManagerProxy;
 use zbus::proxy;
@@ -32,6 +35,15 @@ pub trait BluezAdapter {
 pub trait BluezDevice {
     #[zbus(property)]
     fn connected(&self) -> zbus::Result<bool>;
+
+    #[zbus(property)]
+    fn bonded(&self) -> zbus::Result<bool>;
+
+    #[zbus(property)]
+    fn paired(&self) -> zbus::Result<bool>;
+
+    #[zbus(property)]
+    fn trusted(&self) -> zbus::Result<bool>;
 
     #[zbus(property)]
     fn alias(&self) -> zbus::Result<String>;
@@ -96,20 +108,14 @@ impl From<&BluezPowerState> for bool {
 }
 
 #[derive(Debug)]
-pub struct BluezConnectedDev {
+pub struct BluezDev {
     alias: String,
     address: String,
-    battery: u8,
-}
-
-impl fmt::Display for BluezConnectedDev {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}/{} (battery: %{})",
-            self.alias, self.address, self.battery
-        )
-    }
+    connected: bool,
+    paired: bool,
+    trusted: bool,
+    bonded: bool,
+    battery: Option<u8>,
 }
 
 pub struct Bluez {
@@ -170,7 +176,7 @@ impl Bluez {
         Ok(new_state)
     }
 
-    pub fn connected_devs(&self) -> zbus::Result<Vec<BluezConnectedDev>> {
+    pub fn devs(&self) -> zbus::Result<Vec<BluezDev>> {
         let dev_paths = self.get_dev_object_paths()?;
 
         Ok(dev_paths
@@ -178,25 +184,33 @@ impl Bluez {
             .filter_map(|dev_path| {
                 let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path)).ok()?;
 
-                let is_connected = dev_proxy.connected().ok()?;
-                if !is_connected {
-                    return None;
+                let mut dev = BluezDev {
+                    alias: dev_proxy.alias().ok()?,
+                    address: dev_proxy.address().ok()?,
+                    connected: dev_proxy.connected().ok()?,
+                    paired: dev_proxy.paired().ok()?,
+                    trusted: dev_proxy.trusted().ok()?,
+                    bonded: dev_proxy.bonded().ok()?,
+                    battery: None,
+                };
+
+                if !dev.connected {
+                    return Some(dev);
                 }
 
                 let battery_proxy: BluezDeviceBatteryProxy =
                     self.build_proxy(Some(&dev_path)).ok()?;
+                dev.battery = Some(battery_proxy.percentage().ok()?);
 
-                let address = dev_proxy.address().ok()?;
-                let alias = dev_proxy.alias().ok()?;
-                let battery = battery_proxy.percentage().ok()?;
-
-                Some(BluezConnectedDev {
-                    alias,
-                    address,
-                    battery,
-                })
+                Some(dev)
             })
-            .collect::<Vec<BluezConnectedDev>>())
+            .collect::<Vec<BluezDev>>())
+    }
+
+    pub fn connected_devs(&self) -> zbus::Result<Vec<BluezDev>> {
+        let devs = self.devs()?;
+
+        Ok(devs.into_iter().filter(|d| d.connected).collect())
     }
 }
 
@@ -213,8 +227,13 @@ pub fn status(f: &mut impl io::Write) -> Result<(), Box<dyn error::Error>> {
     ]
     .join("");
     for dev in connected_devs {
-        buf.push('\n');
-        buf.push_str(&dev.to_string())
+        let format = format!(
+            "\n{}/{} (batt: %{})",
+            dev.alias,
+            dev.address,
+            dev.battery.unwrap()
+        );
+        buf.push_str(&format)
     }
 
     f.write_all(buf.as_bytes())?;
@@ -230,4 +249,154 @@ pub fn toggle(f: &mut impl io::Write) -> Result<(), Box<dyn error::Error>> {
     f.write_all(buf.as_bytes())?;
 
     Ok(())
+}
+
+enum BtListingOutput {
+    Pretty,
+    Terse,
+}
+
+pub trait BtListingConverter {
+    fn get_field_with_key(&self, value: &BtListingKey) -> Box<&dyn fmt::Display>;
+    fn filter_by_status(&self, value: &Option<BtListingStatusKey>) -> bool;
+}
+
+impl BtListingConverter for BluezDev {
+    fn get_field_with_key(&self, value: &BtListingKey) -> Box<&dyn fmt::Display> {
+        match value {
+            BtListingKey::Alias => Box::new(&self.alias),
+            BtListingKey::Address => Box::new(&self.address),
+            BtListingKey::Connected => Box::new(&self.connected),
+            BtListingKey::Trusted => Box::new(&self.trusted),
+            BtListingKey::Bonded => Box::new(&self.bonded),
+            BtListingKey::Paired => Box::new(&self.paired),
+        }
+    }
+
+    fn filter_by_status(&self, value: &Option<BtListingStatusKey>) -> bool {
+        match value {
+            Some(key) => match key {
+                BtListingStatusKey::Connected => self.connected,
+                BtListingStatusKey::Trusted => self.trusted,
+                BtListingStatusKey::Bonded => self.bonded,
+                BtListingStatusKey::Paired => self.paired,
+            },
+            None => true,
+        }
+    }
+}
+
+// TODO: Move this under API crate.
+#[derive(Copy, Clone, Debug, clap::ValueEnum)]
+pub enum BtListingKey {
+    Alias,
+    Address,
+    Connected,
+    Trusted,
+    Bonded,
+    Paired,
+}
+
+impl From<&BtListingKey> for String {
+    fn from(value: &BtListingKey) -> Self {
+        let str = match value {
+            BtListingKey::Alias => "ALIAS",
+            BtListingKey::Address => "ADDRESS",
+            BtListingKey::Connected => "CONNECTED",
+            BtListingKey::Trusted => "TRUSTED",
+            BtListingKey::Bonded => "BONDED",
+            BtListingKey::Paired => "PAIRED",
+        };
+
+        str.to_string()
+    }
+}
+
+#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+pub enum BtListingStatusKey {
+    Connected,
+    Trusted,
+    Bonded,
+    Paired,
+}
+
+const DEFAULT_LISTING_KEYS: [BtListingKey; 6] = [
+    BtListingKey::Alias,
+    BtListingKey::Address,
+    BtListingKey::Connected,
+    BtListingKey::Trusted,
+    BtListingKey::Bonded,
+    BtListingKey::Paired,
+];
+
+// TODO: Now the time comes to create a module this, along with other subcommands.
+pub fn list_devices(
+    f: &mut impl io::Write,
+    columns: Option<Vec<BtListingKey>>,
+    values: Option<Vec<BtListingKey>>,
+    status: Option<BtListingStatusKey>,
+) -> Result<(), Box<dyn error::Error>> {
+    let (out_format, user_listing_keys) = match (columns, values) {
+        (None, None) => (BtListingOutput::Pretty, None),
+        (None, values) => (BtListingOutput::Terse, values),
+        (columns, _) => (BtListingOutput::Pretty, columns),
+    };
+
+    let listing_keys = match user_listing_keys {
+        Some(keys) => keys,
+        None => DEFAULT_LISTING_KEYS.to_vec(),
+    };
+
+    let bluez = Bluez::new()?;
+    let devs = bluez.devs()?;
+
+    let listing = devs.iter().filter_map(|dev| {
+        if !dev.filter_by_status(&status) {
+            None
+        } else {
+            Some(
+                listing_keys
+                    .iter()
+                    .map(|k| dev.get_field_with_key(k).to_string())
+                    .collect::<Vec<String>>(),
+            )
+        }
+    });
+
+    let out_buf = match out_format {
+        BtListingOutput::Pretty => create_pretty_out(listing, &listing_keys),
+        BtListingOutput::Terse => create_terse_out(listing),
+    };
+
+    f.write_all(out_buf.as_bytes())?;
+
+    Ok(())
+}
+
+pub fn create_pretty_out(
+    listing: impl Iterator<Item = Vec<String>>,
+    columns: &[BtListingKey],
+) -> String {
+    let mut builder = Builder::default();
+
+    builder.push_record(columns);
+
+    for row in listing {
+        builder.push_record(row);
+    }
+
+    let mut table = builder.build();
+    table.with(Style::blank());
+
+    format!("{}", table)
+}
+
+pub fn create_terse_out(listing: impl Iterator<Item = Vec<String>>) -> String {
+    listing
+        .map(|l| {
+            let mut terse_str = l.join("/");
+            terse_str.push('\n');
+            terse_str
+        })
+        .collect()
 }
