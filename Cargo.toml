@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.5.39", features = ["derive"] }
+tabled = { version = "0.19.0", features = ["std", "ansi"] }
 zbus = { version = "5.7.1", default-features = false, features = ["tokio", "blocking-api"] }
