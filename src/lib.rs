@@ -285,18 +285,6 @@ impl BtListingConverter for BluezDev {
         }
     }
 }
-
-// TODO: Move this under API crate.
-#[derive(Copy, Clone, Debug, clap::ValueEnum)]
-pub enum BtListingKey {
-    Alias,
-    Address,
-    Connected,
-    Trusted,
-    Bonded,
-    Paired,
-}
-
 impl From<&BtListingKey> for String {
     fn from(value: &BtListingKey) -> Self {
         let str = match value {
@@ -310,14 +298,6 @@ impl From<&BtListingKey> for String {
 
         str.to_string()
     }
-}
-
-#[derive(Debug, Copy, Clone, clap::ValueEnum)]
-pub enum BtListingStatusKey {
-    Connected,
-    Trusted,
-    Bonded,
-    Paired,
 }
 
 const DEFAULT_LISTING_KEYS: [BtListingKey; 6] = [

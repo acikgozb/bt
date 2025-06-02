@@ -1,7 +1,5 @@
 use clap::{Args, Parser, Subcommand, arg, command};
 
-use crate::{BtListingKey, BtListingStatusKey};
-
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
@@ -62,4 +60,22 @@ pub struct ScanArgs {
     /// Set the duration of the scan.
     #[arg(short, long, default_value_t = 5u8)]
     duration: u8,
+}
+
+#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+pub enum BtListingKey {
+    Alias,
+    Address,
+    Connected,
+    Trusted,
+    Bonded,
+    Paired,
+}
+
+#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+pub enum BtListingStatusKey {
+    Connected,
+    Trusted,
+    Bonded,
+    Paired,
 }
