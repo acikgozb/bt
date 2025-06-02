@@ -4,16 +4,6 @@ use std::{error, fmt, io};
 use tabled::builder::Builder;
 use tabled::settings::Style;
 
-pub fn toggle(f: &mut impl io::Write) -> Result<(), Box<dyn error::Error>> {
-    let bluez = Bluez::new()?;
-    let toggled_power_state = bluez.toggle_power_state()?;
-
-    let buf = format!("bluetooth: {}", toggled_power_state);
-    f.write_all(buf.as_bytes())?;
-
-    Ok(())
-}
-
 enum BtListingOutput {
     Pretty,
     Terse,
@@ -145,5 +135,7 @@ pub fn create_terse_out(listing: impl Iterator<Item = Vec<String>>) -> String {
 }
 mod bluez;
 mod status;
+mod toggle;
 
 pub use status::status;
+pub use toggle::toggle;
