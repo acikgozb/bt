@@ -21,7 +21,7 @@ fn run() -> Result<(), Box<dyn error::Error>> {
         match subcommand {
             BtCommand::Status => bt::status(&mut stdout),
             BtCommand::Toggle => bt::toggle(&mut stdout),
-            BtCommand::Scan { args } => todo!(),
+            BtCommand::Scan { args } => bt::scan(&mut stdout, &args),
             BtCommand::Connect { args } => todo!(),
             BtCommand::Disconnect { force } => todo!(),
             BtCommand::ListDevices { args } => bt::list_devices(&mut stdout, &args),
