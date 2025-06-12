@@ -24,11 +24,7 @@ fn run() -> Result<(), Box<dyn error::Error>> {
             BtCommand::Scan { args } => todo!(),
             BtCommand::Connect { args } => todo!(),
             BtCommand::Disconnect { force } => todo!(),
-            BtCommand::ListDevices {
-                columns,
-                values,
-                status,
-            } => bt::list_devices(&mut stdout, columns, values, status),
+            BtCommand::ListDevices { args } => bt::list_devices(&mut stdout, &args),
         }
     } else {
         bt::status(&mut stdout)

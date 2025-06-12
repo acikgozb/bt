@@ -1,65 +1,96 @@
 use std::{error, io};
 
+use clap::{Args, arg};
 use tabled::{builder::Builder, settings::Style};
 
-use crate::{
-    api::{BtListingKey, BtListingStatusKey},
-    bluez,
-};
+use crate::bluez;
 
-const DEFAULT_LISTING_KEYS: [BtListingKey; 6] = [
-    BtListingKey::Alias,
-    BtListingKey::Address,
-    BtListingKey::Connected,
-    BtListingKey::Trusted,
-    BtListingKey::Bonded,
-    BtListingKey::Paired,
+#[derive(Debug, Args)]
+pub struct ListDevicesArgs {
+    /// Filter the table output based on given keys.
+    #[arg(short, long, value_delimiter = ',')]
+    columns: Option<Vec<ListDevicesColumn>>,
+
+    /// Filter the terse output based on given keys.
+    #[arg(short, long, value_delimiter = ',')]
+    values: Option<Vec<ListDevicesColumn>>,
+
+    /// Filter output based on device status.
+    #[arg(short, long)]
+    status: Option<DeviceStatus>,
+}
+
+#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+pub enum ListDevicesColumn {
+    Alias,
+    Address,
+    Connected,
+    Trusted,
+    Bonded,
+    Paired,
+}
+
+#[derive(Debug, Copy, Clone, clap::ValueEnum)]
+pub enum DeviceStatus {
+    Connected,
+    Trusted,
+    Bonded,
+    Paired,
+}
+
+const DEFAULT_LISTING_KEYS: [ListDevicesColumn; 6] = [
+    ListDevicesColumn::Alias,
+    ListDevicesColumn::Address,
+    ListDevicesColumn::Connected,
+    ListDevicesColumn::Trusted,
+    ListDevicesColumn::Bonded,
+    ListDevicesColumn::Paired,
 ];
 
-enum BtListingOutput {
+enum ListDevicesOutput {
     Pretty,
     Terse,
 }
 
 pub trait BtListingConverter {
-    fn get_listing_field_by_key(&self, value: &BtListingKey) -> String;
-    fn filter_listing_by_status(&self, value: &Option<BtListingStatusKey>) -> bool;
+    fn get_listing_field_by_key(&self, value: &ListDevicesColumn) -> String;
+    fn filter_listing_by_status(&self, value: &Option<DeviceStatus>) -> bool;
 }
 
 impl BtListingConverter for bluez::Device {
-    fn get_listing_field_by_key(&self, value: &BtListingKey) -> String {
+    fn get_listing_field_by_key(&self, value: &ListDevicesColumn) -> String {
         match value {
-            BtListingKey::Alias => self.alias(),
-            BtListingKey::Address => self.address(),
-            BtListingKey::Connected => self.connected().to_string(),
-            BtListingKey::Trusted => self.trusted().to_string(),
-            BtListingKey::Bonded => self.bonded().to_string(),
-            BtListingKey::Paired => self.paired().to_string(),
+            ListDevicesColumn::Alias => self.alias(),
+            ListDevicesColumn::Address => self.address(),
+            ListDevicesColumn::Connected => self.connected().to_string(),
+            ListDevicesColumn::Trusted => self.trusted().to_string(),
+            ListDevicesColumn::Bonded => self.bonded().to_string(),
+            ListDevicesColumn::Paired => self.paired().to_string(),
         }
     }
 
-    fn filter_listing_by_status(&self, value: &Option<BtListingStatusKey>) -> bool {
+    fn filter_listing_by_status(&self, value: &Option<DeviceStatus>) -> bool {
         match value {
             Some(key) => match key {
-                BtListingStatusKey::Connected => self.connected(),
-                BtListingStatusKey::Trusted => self.trusted(),
-                BtListingStatusKey::Bonded => self.bonded(),
-                BtListingStatusKey::Paired => self.paired(),
+                DeviceStatus::Connected => self.connected(),
+                DeviceStatus::Trusted => self.trusted(),
+                DeviceStatus::Bonded => self.bonded(),
+                DeviceStatus::Paired => self.paired(),
             },
             None => true,
         }
     }
 }
 
-impl From<&BtListingKey> for String {
-    fn from(value: &BtListingKey) -> Self {
+impl From<&ListDevicesColumn> for String {
+    fn from(value: &ListDevicesColumn) -> Self {
         let str = match value {
-            BtListingKey::Alias => "ALIAS",
-            BtListingKey::Address => "ADDRESS",
-            BtListingKey::Connected => "CONNECTED",
-            BtListingKey::Trusted => "TRUSTED",
-            BtListingKey::Bonded => "BONDED",
-            BtListingKey::Paired => "PAIRED",
+            ListDevicesColumn::Alias => "ALIAS",
+            ListDevicesColumn::Address => "ADDRESS",
+            ListDevicesColumn::Connected => "CONNECTED",
+            ListDevicesColumn::Trusted => "TRUSTED",
+            ListDevicesColumn::Bonded => "BONDED",
+            ListDevicesColumn::Paired => "PAIRED",
         };
 
         str.to_string()
@@ -68,26 +99,24 @@ impl From<&BtListingKey> for String {
 
 pub fn list_devices(
     f: &mut impl io::Write,
-    columns: Option<Vec<BtListingKey>>,
-    values: Option<Vec<BtListingKey>>,
-    status: Option<BtListingStatusKey>,
+    args: &ListDevicesArgs,
 ) -> Result<(), Box<dyn error::Error>> {
-    let (out_format, user_listing_keys) = match (columns, values) {
-        (None, None) => (BtListingOutput::Pretty, None),
-        (None, values) => (BtListingOutput::Terse, values),
-        (columns, _) => (BtListingOutput::Pretty, columns),
+    let (out_format, user_listing_keys) = match (&args.columns, &args.values) {
+        (None, None) => (ListDevicesOutput::Pretty, None),
+        (None, values) => (ListDevicesOutput::Terse, values.as_ref()),
+        (columns, _) => (ListDevicesOutput::Pretty, columns.as_ref()),
     };
 
     let listing_keys = match user_listing_keys {
         Some(keys) => keys,
-        None => DEFAULT_LISTING_KEYS.to_vec(),
+        None => &DEFAULT_LISTING_KEYS.to_vec(),
     };
 
     let bluez = bluez::Client::new()?;
     let devs = bluez.devs()?;
 
     let listing = devs.iter().filter_map(|dev| {
-        if !dev.filter_listing_by_status(&status) {
+        if !dev.filter_listing_by_status(&args.status) {
             None
         } else {
             Some(
@@ -100,8 +129,8 @@ pub fn list_devices(
     });
 
     let out_buf = match out_format {
-        BtListingOutput::Pretty => create_pretty_out(listing, &listing_keys),
-        BtListingOutput::Terse => create_terse_out(listing),
+        ListDevicesOutput::Pretty => create_pretty_out(listing, listing_keys),
+        ListDevicesOutput::Terse => create_terse_out(listing),
     };
 
     f.write_all(out_buf.as_bytes())?;
@@ -111,7 +140,7 @@ pub fn list_devices(
 
 pub fn create_pretty_out(
     listing: impl Iterator<Item = Vec<String>>,
-    columns: &[BtListingKey],
+    columns: &[ListDevicesColumn],
 ) -> String {
     let mut builder = Builder::default();
 
