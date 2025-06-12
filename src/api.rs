@@ -1,6 +1,6 @@
-use clap::{Args, Parser, Subcommand, arg, command};
+use clap::{Parser, Subcommand, arg, command};
 
-use crate::list_devices::ListDevicesArgs;
+use crate::{list_devices::ListDevicesArgs, scan::ScanArgs};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -46,11 +46,4 @@ pub enum BtCommand {
         #[arg(short, long, default_value_t = false)]
         force: bool,
     },
-}
-
-#[derive(Debug, Args)]
-pub struct ScanArgs {
-    /// Set the duration of the scan.
-    #[arg(short, long, default_value_t = 5u8)]
-    duration: u8,
 }

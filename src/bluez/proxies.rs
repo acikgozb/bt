@@ -14,6 +14,10 @@ pub trait BluezAdapter {
 
     #[zbus(property)]
     fn set_powered(&self, power_state: bool) -> zbus::Result<()>;
+
+    fn start_discovery(&self) -> zbus::Result<()>;
+
+    fn stop_discovery(&self) -> zbus::Result<()>;
 }
 
 #[proxy(
@@ -41,6 +45,9 @@ pub trait BluezDevice {
 
     #[zbus(property)]
     fn address(&self) -> zbus::Result<String>;
+
+    #[zbus(property, name = "RSSI")]
+    fn rssi(&self) -> zbus::Result<i16>;
 }
 
 #[proxy(

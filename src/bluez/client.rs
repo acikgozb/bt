@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, thread, time::Duration};
 
 use zbus::{
     blocking::{Connection, fdo::ObjectManagerProxy},
@@ -56,6 +56,7 @@ pub struct BluezDev {
     trusted: bool,
     bonded: bool,
     battery: Option<u8>,
+    rssi: Option<i16>,
 }
 impl BluezDev {
     pub fn connected(&self) -> bool {
@@ -84,6 +85,10 @@ impl BluezDev {
 
     pub fn battery(&self) -> &Option<u8> {
         &self.battery
+    }
+
+    pub fn rssi(&self) -> &Option<i16> {
+        &self.rssi
     }
 }
 
@@ -161,7 +166,12 @@ impl Bluez {
                     trusted: dev_proxy.trusted().ok()?,
                     bonded: dev_proxy.bonded().ok()?,
                     battery: None,
+                    rssi: None,
                 };
+
+                if let Ok(rssi) = dev_proxy.rssi() {
+                    dev.rssi = Some(rssi);
+                }
 
                 if !dev.connected {
                     return Some(dev);
@@ -180,5 +190,16 @@ impl Bluez {
         let devs = self.devs()?;
 
         Ok(devs.into_iter().filter(|d| d.connected).collect())
+    }
+
+    pub fn scan(&self, duration: &u8) -> zbus::Result<Vec<BluezDev>> {
+        let adapter_proxy = BluezAdapterProxy::new(&self.connection)?;
+        adapter_proxy.start_discovery()?;
+
+        thread::sleep(Duration::from_secs(u64::from(*duration)));
+        let devs = self.devs()?;
+        adapter_proxy.stop_discovery()?;
+
+        Ok(devs.into_iter().filter(|d| d.rssi.is_some()).collect())
     }
 }
