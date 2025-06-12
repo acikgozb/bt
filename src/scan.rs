@@ -14,14 +14,14 @@ pub struct ScanArgs {
     /// Filter the pretty output based on given columns.
     ///
     /// If no columns are provided, then the full pretty output is shown to the user.
-    #[arg(short, long, value_delimiter = ',', num_args = 0..)]
-    pub columns: Vec<ScanColumn>,
+    #[arg(short, long, value_delimiter = ',', num_args = 0.., default_value = None)]
+    pub columns: Option<Vec<ScanColumn>>,
 
     /// Filter the terse output based on given columns.
     ///
     /// If no columns are provided, then the full terse output is shown to the user.
-    #[arg(short, long, value_delimiter = ',', num_args = 0..)]
-    pub values: Vec<ScanColumn>,
+    #[arg(short, long, value_delimiter = ',', num_args = 0.., default_value = None)]
+    pub values: Option<Vec<ScanColumn>>,
 }
 
 #[derive(Debug, Copy, Clone, clap::ValueEnum)]
@@ -69,10 +69,24 @@ pub fn scan(f: &mut impl io::Write, args: &ScanArgs) -> Result<(), Box<dyn error
     let bluez = bluez::Client::new()?;
     let scan_result = bluez.scan(&args.duration)?;
 
-    let (out_format, listing_keys) = match (&args.columns.len(), &args.values.len()) {
-        (0, 0) => (ScanOutput::Pretty, &DEFAULT_LISTING_KEYS.to_vec()),
-        (0, _) => (ScanOutput::Terse, &args.values),
-        (_, _) => (ScanOutput::Pretty, &args.columns),
+    let (out_format, listing_keys) = match (&args.columns, &args.values) {
+        (None, None) => (ScanOutput::Pretty, &DEFAULT_LISTING_KEYS.to_vec()),
+        (None, Some(v)) => (
+            ScanOutput::Terse,
+            if v.is_empty() {
+                &DEFAULT_LISTING_KEYS.to_vec()
+            } else {
+                v
+            },
+        ),
+        (Some(c), _) => (
+            ScanOutput::Pretty,
+            if c.is_empty() {
+                &DEFAULT_LISTING_KEYS.to_vec()
+            } else {
+                c
+            },
+        ),
     };
 
     let listing = scan_result.iter().map(|d| {
