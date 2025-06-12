@@ -1,5 +1,7 @@
 use clap::{Args, Parser, Subcommand, arg, command};
 
+use crate::list_devices::ListDevicesArgs;
+
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
@@ -19,17 +21,8 @@ pub enum BtCommand {
 
     #[clap(visible_alias = "ls")]
     ListDevices {
-        /// Filter the table output based on given keys.
-        #[arg(short, long, value_delimiter = ',')]
-        columns: Option<Vec<BtListingKey>>,
-
-        /// Filter the terse output based on given keys.
-        #[arg(short, long, value_delimiter = ',')]
-        values: Option<Vec<BtListingKey>>,
-
-        /// Filter output based on device status.
-        #[arg(short, long)]
-        status: Option<BtListingStatusKey>,
+        #[command(flatten)]
+        args: ListDevicesArgs,
     },
 
     /// Scan available devices.
@@ -60,22 +53,4 @@ pub struct ScanArgs {
     /// Set the duration of the scan.
     #[arg(short, long, default_value_t = 5u8)]
     duration: u8,
-}
-
-#[derive(Debug, Copy, Clone, clap::ValueEnum)]
-pub enum BtListingKey {
-    Alias,
-    Address,
-    Connected,
-    Trusted,
-    Bonded,
-    Paired,
-}
-
-#[derive(Debug, Copy, Clone, clap::ValueEnum)]
-pub enum BtListingStatusKey {
-    Connected,
-    Trusted,
-    Bonded,
-    Paired,
 }
