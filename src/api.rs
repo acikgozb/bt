@@ -1,6 +1,6 @@
-use clap::{Args, Parser, Subcommand, arg, command};
+use clap::{Parser, Subcommand, arg, command};
 
-use crate::{list_devices::ListDevicesArgs, scan::ScanArgs};
+use crate::{connect::ConnectArgs, list_devices::ListDevicesArgs, scan::ScanArgs};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -46,26 +46,4 @@ pub enum BtCommand {
         #[arg(short, long, default_value_t = false)]
         force: bool,
     },
-}
-
-#[derive(Debug, Args)]
-pub struct ConnectArgs {
-    /// Set the duration of the scan.
-    ///
-    /// This option is only available during the interactive mode.
-    #[arg(short, long, default_value_t = 5u8, conflicts_with = "alias")]
-    pub duration: u8,
-
-    /// Show available devices that contains the name <NAME> in their ALIAS.
-    ///
-    /// This option is only available during the interactive mode.
-    #[arg(short, long, conflicts_with = "alias")]
-    pub contains_name: Option<String>,
-
-    /// Connect to ALIAS if it the device is available.
-    ///
-    /// This option does not initiate a scan, therefore it bypasses the interactive mode completely.
-    /// This option expects the full device ALIAS, unlike --contains-name.
-    #[arg(short, long)]
-    pub alias: Option<String>,
 }
