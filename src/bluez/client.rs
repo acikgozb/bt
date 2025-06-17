@@ -102,20 +102,17 @@ impl Bluez {
         Ok(Self { connection })
     }
 
-    fn get_dev_object_paths(&self) -> zbus::Result<Vec<OwnedObjectPath>> {
+    fn dev_object_iter(&self) -> zbus::Result<impl Iterator<Item = OwnedObjectPath>> {
         let object_manager_proxy = ObjectManagerProxy::new(&self.connection, "org.bluez", "/")?;
         let objects = object_manager_proxy.get_managed_objects()?;
 
-        let dev_paths = objects
-            .into_keys()
-            .filter(|k| {
-                if let Some(path) = k.rsplitn(2, "/").take(1).next() {
-                    path.contains("dev")
-                } else {
-                    false
-                }
-            })
-            .collect::<Vec<OwnedObjectPath>>();
+        let dev_paths = objects.into_keys().filter(|k| {
+            if let Some(path) = k.rsplitn(2, "/").take(1).next() {
+                path.contains("dev")
+            } else {
+                false
+            }
+        });
 
         Ok(dev_paths)
     }
@@ -151,10 +148,9 @@ impl Bluez {
     }
 
     pub fn devs(&self) -> zbus::Result<Vec<BluezDev>> {
-        let dev_paths = self.get_dev_object_paths()?;
+        let dev_object_iter = self.dev_object_iter()?;
 
-        Ok(dev_paths
-            .into_iter()
+        Ok(dev_object_iter
             .filter_map(|dev_path| {
                 let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path)).ok()?;
 
