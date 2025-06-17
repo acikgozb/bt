@@ -75,12 +75,12 @@ impl BluezDev {
         self.bonded
     }
 
-    pub fn alias(&self) -> String {
-        self.alias.clone()
+    pub fn alias(&self) -> &str {
+        &self.alias
     }
 
-    pub fn address(&self) -> String {
-        self.address.clone()
+    pub fn address(&self) -> &str {
+        &self.address
     }
 
     pub fn battery(&self) -> &Option<u8> {

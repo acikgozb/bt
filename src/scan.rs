@@ -46,8 +46,8 @@ pub trait Listable {
 impl Listable for bluez::Device {
     fn get_listing_field_by_column(&self, value: &ScanColumn) -> String {
         match value {
-            ScanColumn::Alias => self.alias(),
-            ScanColumn::Address => self.address(),
+            ScanColumn::Alias => self.alias().to_string(),
+            ScanColumn::Address => self.address().to_string(),
             ScanColumn::Rssi => self.rssi().unwrap_or(0).to_string(),
         }
     }

@@ -60,8 +60,8 @@ pub trait BtListingConverter {
 impl BtListingConverter for bluez::Device {
     fn get_listing_field_by_key(&self, value: &ListDevicesColumn) -> String {
         match value {
-            ListDevicesColumn::Alias => self.alias(),
-            ListDevicesColumn::Address => self.address(),
+            ListDevicesColumn::Alias => self.alias().to_string(),
+            ListDevicesColumn::Address => self.address().to_string(),
             ListDevicesColumn::Connected => self.connected().to_string(),
             ListDevicesColumn::Trusted => self.trusted().to_string(),
             ListDevicesColumn::Bonded => self.bonded().to_string(),
