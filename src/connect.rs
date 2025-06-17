@@ -16,13 +16,13 @@ pub struct ConnectArgs {
     #[arg(short, long)]
     pub contains_name: Option<String>,
 
-    /// Connect to a device via its full device ALIAS.
+    /// Connect to a known device via its full device ALIAS.
     ///
     /// The ALIAS provided must be the full device ALIAS, unlike --contains-name.
     ///
     /// If this argument is not provided, then connect first initiates a scan to let users choose a device ALIAS. (interactive mode)
     ///
-    /// If this argument is provided, then connect does not initiate a scan and attempts to connect to a device via ALIAS. (non-interactive mode)
+    /// If this argument is provided, then connect does not initiate a scan and attempts to connect to a known device via ALIAS. (non-interactive mode)
     pub alias: Option<String>,
 }
 
