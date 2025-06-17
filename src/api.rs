@@ -39,11 +39,19 @@ pub enum BtCommand {
         args: ConnectArgs,
     },
 
-    /// Disconnect from an available device.
+    /// Disconnect from the connected device(s).
     #[clap(visible_alias = "d")]
     Disconnect {
-        /// Remove the device from the known devices list.
+        /// Remove the device(s) from the known devices list.
         #[arg(short, long, default_value_t = false)]
         force: bool,
+
+        /// Disconnect by specifying the full ALIAS of device(s).
+        ///
+        /// If this argument is not provided, then disconnect first shows the list of connected devices to let users choose. (interactive mode)
+        ///
+        /// If this argument is provided, then disconnect does not show the list. (non-interactive mode)
+        #[arg(value_name = "ALIAS", value_delimiter = ' ', num_args = 0.., default_value = None)]
+        aliases: Option<Vec<String>>,
     },
 }
