@@ -24,7 +24,9 @@ fn run() -> Result<(), Box<dyn error::Error>> {
             BtCommand::Toggle => bt::toggle(&mut stdout),
             BtCommand::Scan { args } => bt::scan(&mut stdout, &args),
             BtCommand::Connect { args } => bt::connect(&mut stdout, &mut stdin, &args),
-            BtCommand::Disconnect { force, aliases } => todo!(),
+            BtCommand::Disconnect { force, aliases } => {
+                bt::disconnect(&mut stdout, &mut stdin, &force, &aliases)
+            }
             BtCommand::ListDevices { args } => bt::list_devices(&mut stdout, &args),
         }
     } else {
