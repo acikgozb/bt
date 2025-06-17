@@ -1,4 +1,4 @@
-use std::{fmt, thread, time::Duration};
+use std::fmt;
 
 use zbus::{
     blocking::{Connection, fdo::ObjectManagerProxy},
@@ -75,12 +75,12 @@ impl BluezDev {
         self.bonded
     }
 
-    pub fn alias(&self) -> String {
-        self.alias.clone()
+    pub fn alias(&self) -> &str {
+        &self.alias
     }
 
-    pub fn address(&self) -> String {
-        self.address.clone()
+    pub fn address(&self) -> &str {
+        &self.address
     }
 
     pub fn battery(&self) -> &Option<u8> {
@@ -102,20 +102,17 @@ impl Bluez {
         Ok(Self { connection })
     }
 
-    fn get_dev_object_paths(&self) -> zbus::Result<Vec<OwnedObjectPath>> {
+    fn dev_object_iter(&self) -> zbus::Result<impl Iterator<Item = OwnedObjectPath>> {
         let object_manager_proxy = ObjectManagerProxy::new(&self.connection, "org.bluez", "/")?;
         let objects = object_manager_proxy.get_managed_objects()?;
 
-        let dev_paths = objects
-            .into_keys()
-            .filter(|k| {
-                if let Some(path) = k.rsplitn(2, "/").take(1).next() {
-                    path.contains("dev")
-                } else {
-                    false
-                }
-            })
-            .collect::<Vec<OwnedObjectPath>>();
+        let dev_paths = objects.into_keys().filter(|k| {
+            if let Some(path) = k.rsplitn(2, "/").take(1).next() {
+                path.contains("dev")
+            } else {
+                false
+            }
+        });
 
         Ok(dev_paths)
     }
@@ -151,10 +148,9 @@ impl Bluez {
     }
 
     pub fn devs(&self) -> zbus::Result<Vec<BluezDev>> {
-        let dev_paths = self.get_dev_object_paths()?;
+        let dev_object_iter = self.dev_object_iter()?;
 
-        Ok(dev_paths
-            .into_iter()
+        Ok(dev_object_iter
             .filter_map(|dev_path| {
                 let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path)).ok()?;
 
@@ -186,20 +182,39 @@ impl Bluez {
             .collect::<Vec<BluezDev>>())
     }
 
+    pub fn connect(&self, alias: &str) -> zbus::Result<()> {
+        let dev_paths = self.dev_object_iter()?;
+
+        for dev_path in dev_paths {
+            let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path))?;
+
+            let dev_alias = dev_proxy.alias()?;
+            if dev_alias == alias {
+                return dev_proxy.connect();
+            }
+        }
+
+        Err(zbus::Error::InterfaceNotFound)
+    }
+
     pub fn connected_devs(&self) -> zbus::Result<Vec<BluezDev>> {
         let devs = self.devs()?;
 
         Ok(devs.into_iter().filter(|d| d.connected).collect())
     }
 
-    pub fn scan(&self, duration: &u8) -> zbus::Result<Vec<BluezDev>> {
-        let adapter_proxy = BluezAdapterProxy::new(&self.connection)?;
-        adapter_proxy.start_discovery()?;
+    pub fn start_discovery(&self) -> zbus::Result<()> {
+        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
+        adapter_proxy.start_discovery()
+    }
 
-        thread::sleep(Duration::from_secs(u64::from(*duration)));
+    pub fn stop_discovery(&self) -> zbus::Result<()> {
+        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
+        adapter_proxy.stop_discovery()
+    }
+
+    pub fn scanned_devices(&self) -> zbus::Result<Vec<BluezDev>> {
         let devs = self.devs()?;
-        adapter_proxy.stop_discovery()?;
-
         Ok(devs.into_iter().filter(|d| d.rssi.is_some()).collect())
     }
 }
