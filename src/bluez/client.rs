@@ -182,6 +182,21 @@ impl Bluez {
             .collect::<Vec<BluezDev>>())
     }
 
+    pub fn connect(&self, alias: &str) -> zbus::Result<()> {
+        let dev_paths = self.dev_object_iter()?;
+
+        for dev_path in dev_paths {
+            let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path))?;
+
+            let dev_alias = dev_proxy.alias()?;
+            if dev_alias == alias {
+                return dev_proxy.connect();
+            }
+        }
+
+        Err(zbus::Error::InterfaceNotFound)
+    }
+
     pub fn connected_devs(&self) -> zbus::Result<Vec<BluezDev>> {
         let devs = self.devs()?;
 

@@ -48,6 +48,8 @@ pub trait BluezDevice {
 
     #[zbus(property, name = "RSSI")]
     fn rssi(&self) -> zbus::Result<i16>;
+
+    fn connect(&self) -> zbus::Result<()>;
 }
 
 #[proxy(
