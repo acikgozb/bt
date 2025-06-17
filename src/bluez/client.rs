@@ -1,4 +1,4 @@
-use std::{fmt, thread, time::Duration};
+use std::fmt;
 
 use zbus::{
     blocking::{Connection, fdo::ObjectManagerProxy},
@@ -188,14 +188,18 @@ impl Bluez {
         Ok(devs.into_iter().filter(|d| d.connected).collect())
     }
 
-    pub fn scan(&self, duration: &u8) -> zbus::Result<Vec<BluezDev>> {
-        let adapter_proxy = BluezAdapterProxy::new(&self.connection)?;
-        adapter_proxy.start_discovery()?;
+    pub fn start_discovery(&self) -> zbus::Result<()> {
+        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
+        adapter_proxy.start_discovery()
+    }
 
-        thread::sleep(Duration::from_secs(u64::from(*duration)));
+    pub fn stop_discovery(&self) -> zbus::Result<()> {
+        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
+        adapter_proxy.stop_discovery()
+    }
+
+    pub fn scanned_devices(&self) -> zbus::Result<Vec<BluezDev>> {
         let devs = self.devs()?;
-        adapter_proxy.stop_discovery()?;
-
         Ok(devs.into_iter().filter(|d| d.rssi.is_some()).collect())
     }
 }

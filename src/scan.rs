@@ -1,4 +1,4 @@
-use std::{error, io};
+use std::{error, io, thread, time::Duration};
 
 use clap::Args;
 use tabled::{builder::Builder, settings::Style};
@@ -66,9 +66,6 @@ impl From<&ScanColumn> for String {
 }
 
 pub fn scan(f: &mut impl io::Write, args: &ScanArgs) -> Result<(), Box<dyn error::Error>> {
-    let bluez = bluez::Client::new()?;
-    let scan_result = bluez.scan(&args.duration)?;
-
     let (out_format, listing_keys) = match (&args.columns, &args.values) {
         (None, None) => (ScanOutput::Pretty, &DEFAULT_LISTING_KEYS.to_vec()),
         (None, Some(v)) => (
@@ -89,7 +86,14 @@ pub fn scan(f: &mut impl io::Write, args: &ScanArgs) -> Result<(), Box<dyn error
         ),
     };
 
-    let listing = scan_result.iter().map(|d| {
+    let bluez = bluez::Client::new()?;
+
+    bluez.start_discovery()?;
+    thread::sleep(Duration::from_secs(u64::from(args.duration)));
+
+    let scanned_devices = bluez.scanned_devices()?;
+
+    let listing = scanned_devices.iter().map(|d| {
         listing_keys
             .iter()
             .map(|k| d.get_listing_field_by_column(k))
@@ -103,8 +107,11 @@ pub fn scan(f: &mut impl io::Write, args: &ScanArgs) -> Result<(), Box<dyn error
 
     f.write_all(out_buf.as_bytes())?;
 
+    bluez.stop_discovery()?;
+
     Ok(())
 }
+
 pub fn create_pretty_out(
     listing: impl Iterator<Item = Vec<String>>,
     columns: &[ScanColumn],
