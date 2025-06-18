@@ -1,4 +1,4 @@
-use zbus::proxy;
+use zbus::{proxy, zvariant::ObjectPath};
 
 #[proxy(
     default_service = "org.bluez",
@@ -18,6 +18,8 @@ pub trait BluezAdapter {
     fn start_discovery(&self) -> zbus::Result<()>;
 
     fn stop_discovery(&self) -> zbus::Result<()>;
+
+    fn remove_device(&self, object: ObjectPath<'static>) -> zbus::Result<()>;
 }
 
 #[proxy(
@@ -50,6 +52,8 @@ pub trait BluezDevice {
     fn rssi(&self) -> zbus::Result<i16>;
 
     fn connect(&self) -> zbus::Result<()>;
+
+    fn disconnect(&self) -> zbus::Result<()>;
 }
 
 #[proxy(

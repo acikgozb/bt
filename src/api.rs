@@ -51,7 +51,7 @@ pub enum BtCommand {
         /// If this argument is not provided, then disconnect first shows the list of connected devices to let users choose. (interactive mode)
         ///
         /// If this argument is provided, then disconnect does not show the list. (non-interactive mode)
-        #[arg(value_name = "ALIAS", value_delimiter = ' ', num_args = 0.., default_value = None)]
+        #[arg(value_name = "ALIAS", value_delimiter = ',', num_args = 0.., default_value = None)]
         aliases: Option<Vec<String>>,
     },
 }

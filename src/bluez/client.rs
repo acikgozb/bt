@@ -217,4 +217,47 @@ impl Bluez {
         let devs = self.devs()?;
         Ok(devs.into_iter().filter(|d| d.rssi.is_some()).collect())
     }
+
+    pub fn remove(&self, alias: &str) -> zbus::Result<()> {
+        let mut dev_object_iter = self.dev_object_iter()?;
+
+        let dev_object = dev_object_iter.find_map(|obj| {
+            let dev_object = obj.into_inner();
+            let dev_proxy = BluezDeviceProxy::new(&self.connection, &dev_object).ok()?;
+
+            if alias == dev_proxy.alias().ok()? {
+                Some(dev_object)
+            } else {
+                None
+            }
+        });
+
+        if let Some(dev_object) = dev_object {
+            let adapter_proxy = BluezAdapterProxy::new(&self.connection)?;
+            adapter_proxy.remove_device(dev_object)
+        } else {
+            Err(zbus::Error::InterfaceNotFound)
+        }
+    }
+
+    pub fn disconnect(&self, alias: &str) -> zbus::Result<()> {
+        let mut dev_object_iter = self.dev_object_iter()?;
+
+        let dev_proxy = dev_object_iter.find_map(|obj| {
+            let dev_object = obj.into_inner();
+            let dev_proxy = BluezDeviceProxy::new(&self.connection, &dev_object).ok()?;
+
+            if alias == dev_proxy.alias().ok()? {
+                Some(dev_proxy)
+            } else {
+                None
+            }
+        });
+
+        if let Some(dev_proxy) = dev_proxy {
+            dev_proxy.disconnect()
+        } else {
+            Err(zbus::Error::InterfaceNotFound)
+        }
+    }
 }
