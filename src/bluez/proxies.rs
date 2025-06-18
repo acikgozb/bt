@@ -52,6 +52,8 @@ pub trait BluezDevice {
     fn rssi(&self) -> zbus::Result<i16>;
 
     fn connect(&self) -> zbus::Result<()>;
+
+    fn disconnect(&self) -> zbus::Result<()>;
 }
 
 #[proxy(
