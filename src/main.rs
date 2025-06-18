@@ -16,14 +16,17 @@ fn run() -> Result<(), Box<dyn error::Error>> {
     println!("{:?}", args);
 
     let mut stdout = io::stdout();
-    let mut stdin = io::stdin();
+    let stdin = io::stdin();
 
     if let Some(subcommand) = args.command {
         match subcommand {
             BtCommand::Status => bt::status(&mut stdout),
             BtCommand::Toggle => bt::toggle(&mut stdout),
             BtCommand::Scan { args } => bt::scan(&mut stdout, &args),
-            BtCommand::Connect { args } => bt::connect(&mut stdout, &mut stdin, &args),
+            BtCommand::Connect { args } => {
+                let mut locked_stdin = stdin.lock();
+                bt::connect(&mut stdout, &mut locked_stdin, &args)
+            }
             BtCommand::Disconnect { force, aliases } => {
                 let mut locked_stdin = stdin.lock();
                 bt::disconnect(&mut stdout, &mut locked_stdin, &force, &aliases)
