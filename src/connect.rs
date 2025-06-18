@@ -73,7 +73,7 @@ const LISTING_COLUMNS: [ConnectColumn; 3] = [
 
 pub fn connect(
     w: &mut impl io::Write,
-    r: &mut impl io::Read,
+    r: &mut impl io::BufRead,
     args: &ConnectArgs,
 ) -> Result<(), Box<dyn error::Error>> {
     let bluez = bluez::Client::new()?;
@@ -125,7 +125,7 @@ fn scan_devices(
 
 fn read_device_alias(
     w: &mut impl io::Write,
-    r: &mut impl io::Read,
+    r: &mut impl io::BufRead,
     devices: &[bluez::Device],
 ) -> Result<String, Box<dyn error::Error>> {
     let mut device_map: BTreeMap<usize, &bluez::Device> =
@@ -140,10 +140,10 @@ fn read_device_alias(
     w.write_all(prompt.as_bytes())?;
     w.flush()?;
 
-    let mut read_buf: Vec<u8> = Vec::with_capacity(1);
-    r.read_exact(&mut read_buf)?;
+    let mut read_buf = String::with_capacity(1);
+    r.read_line(&mut read_buf)?;
 
-    let selected_idx = String::from_utf8(read_buf)?.trim().parse::<u8>()?;
+    let selected_idx = read_buf.trim().parse::<u8>()?;
     // WARN: Once the errors are designed, replace this unwrap call accordingly.
     let selected_device = device_map.remove(&(selected_idx as usize)).unwrap();
 
