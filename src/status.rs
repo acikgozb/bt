@@ -6,7 +6,6 @@ use crate::bluez;
 pub enum Error {
     PowerState(bluez::Error),
     ConnectedDevices(bluez::Error),
-    DBusClient(bluez::Error),
     Io(io::Error),
 }
 
@@ -18,9 +17,6 @@ impl fmt::Display for Error {
             }
             Error::ConnectedDevices(error) => {
                 write!(f, "unable to get connected devices: {}", error)
-            }
-            Error::DBusClient(error) => {
-                write!(f, "unable to establish a D-Bus connection: {}", error)
             }
             Error::Io(error) => write!(f, "io error: {}", error),
         }

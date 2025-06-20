@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{error, fmt};
 
 use zbus::{
     blocking::{Connection, fdo::ObjectManagerProxy},
@@ -92,6 +92,28 @@ impl BluezDev {
     }
 }
 
+#[derive(Debug)]
+pub enum Error {
+    DBusClient(zbus::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::DBusClient(error) => {
+                write!(f, "unable to establish a Bluez D-Bus connection: {}", error)
+            }
+        }
+    }
+}
+impl error::Error for Error {}
+
+impl From<zbus::Error> for Error {
+    fn from(value: zbus::Error) -> Self {
+        Self::DBusClient(value)
+    }
+}
+
 pub struct Bluez {
     connection: Connection,
     adapter_proxy: BluezAdapterProxy<'static>,
@@ -108,7 +130,7 @@ impl Bluez {
         })
     }
 
-    fn dev_object_iter(&self) -> Result<impl Iterator<Item = OwnedObjectPath>> {
+    fn dev_object_iter(&self) -> zbus::Result<impl Iterator<Item = OwnedObjectPath>> {
         let object_manager_proxy = ObjectManagerProxy::new(&self.connection, "org.bluez", "/")?;
         let objects = object_manager_proxy.get_managed_objects()?;
 
@@ -123,7 +145,8 @@ impl Bluez {
         Ok(dev_paths)
     }
 
-    fn build_proxy<'a, T>(&self, path: Option<&'a str>) -> Result<T>
+    // FIXME: No need for this at all, use proxy::new in approp places.
+    fn build_proxy<'a, T>(&self, path: Option<&'a str>) -> zbus::Result<T>
     where
         T: zbus::blocking::proxy::ProxyImpl<'a> + From<zbus::Proxy<'a>>,
     {
@@ -136,7 +159,7 @@ impl Bluez {
         proxy_builder.build()
     }
 
-    pub fn power_state(&self) -> Result<BluezPowerState> {
+    pub fn power_state(&self) -> zbus::Result<BluezPowerState> {
         let result = self
             .adapter_proxy
             .power_state()
@@ -145,7 +168,7 @@ impl Bluez {
         Ok(result)
     }
 
-    pub fn toggle_power_state(&self) -> Result<BluezPowerState> {
+    pub fn toggle_power_state(&self) -> zbus::Result<BluezPowerState> {
         let prev_state = self
             .adapter_proxy
             .power_state()
@@ -157,7 +180,7 @@ impl Bluez {
         Ok(new_state)
     }
 
-    pub fn devs(&self) -> Result<Vec<BluezDev>> {
+    pub fn devs(&self) -> zbus::Result<Vec<BluezDev>> {
         let dev_object_iter = self.dev_object_iter()?;
 
         Ok(dev_object_iter
@@ -192,7 +215,7 @@ impl Bluez {
             .collect::<Vec<BluezDev>>())
     }
 
-    pub fn connect(&self, alias: &str) -> Result<()> {
+    pub fn connect(&self, alias: &str) -> zbus::Result<()> {
         let dev_paths = self.dev_object_iter()?;
 
         for dev_path in dev_paths {
@@ -207,26 +230,26 @@ impl Bluez {
         Err(zbus::Error::InterfaceNotFound)
     }
 
-    pub fn connected_devs(&self) -> Result<Vec<BluezDev>> {
+    pub fn connected_devs(&self) -> zbus::Result<Vec<BluezDev>> {
         let devs = self.devs()?;
 
         Ok(devs.into_iter().filter(|d| d.connected).collect())
     }
 
-    pub fn start_discovery(&self) -> Result<()> {
+    pub fn start_discovery(&self) -> zbus::Result<()> {
         self.adapter_proxy.start_discovery()
     }
 
-    pub fn stop_discovery(&self) -> Result<()> {
+    pub fn stop_discovery(&self) -> zbus::Result<()> {
         self.adapter_proxy.stop_discovery()
     }
 
-    pub fn scanned_devices(&self) -> Result<Vec<BluezDev>> {
+    pub fn scanned_devices(&self) -> zbus::Result<Vec<BluezDev>> {
         let devs = self.devs()?;
         Ok(devs.into_iter().filter(|d| d.rssi.is_some()).collect())
     }
 
-    pub fn remove(&self, alias: &str) -> Result<()> {
+    pub fn remove(&self, alias: &str) -> zbus::Result<()> {
         let mut dev_object_iter = self.dev_object_iter()?;
 
         let dev_object = dev_object_iter.find_map(|obj| {
@@ -247,7 +270,7 @@ impl Bluez {
         }
     }
 
-    pub fn disconnect(&self, alias: &str) -> Result<()> {
+    pub fn disconnect(&self, alias: &str) -> zbus::Result<()> {
         let mut dev_object_iter = self.dev_object_iter()?;
 
         let dev_proxy = dev_object_iter.find_map(|obj| {
@@ -268,5 +291,3 @@ impl Bluez {
         }
     }
 }
-
-pub type Result<T> = std::result::Result<T, zbus::Error>;
