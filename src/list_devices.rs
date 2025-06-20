@@ -1,9 +1,39 @@
+use core::fmt;
 use std::{error, io};
 
 use clap::{Args, arg};
 use tabled::{builder::Builder, settings::Style};
 
 use crate::bluez;
+
+#[derive(Debug)]
+pub enum Error {
+    DBusClient(bluez::Error),
+    KnownDevices(bluez::Error),
+    Io(io::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::DBusClient(error) => {
+                write!(f, "unable to establish a D-Bus connection: {}", error)
+            }
+            Error::KnownDevices(error) => {
+                write!(f, "unable to get known bluetooth devices: {}", error)
+            }
+            Error::Io(error) => write!(f, "io error: {}", error),
+        }
+    }
+}
+
+impl error::Error for Error {}
+
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        Self::Io(value)
+    }
+}
 
 #[derive(Debug, Args)]
 pub struct ListDevicesArgs {
@@ -97,10 +127,7 @@ impl From<&ListDevicesColumn> for String {
     }
 }
 
-pub fn list_devices(
-    f: &mut impl io::Write,
-    args: &ListDevicesArgs,
-) -> Result<(), Box<dyn error::Error>> {
+pub fn list_devices(f: &mut impl io::Write, args: &ListDevicesArgs) -> Result<(), Error> {
     let (out_format, user_listing_keys) = match (&args.columns, &args.values) {
         (None, None) => (ListDevicesOutput::Pretty, None),
         (None, values) => (ListDevicesOutput::Terse, values.as_ref()),
@@ -112,8 +139,8 @@ pub fn list_devices(
         None => &DEFAULT_LISTING_KEYS.to_vec(),
     };
 
-    let bluez = bluez::Client::new()?;
-    let devs = bluez.devs()?;
+    let bluez = bluez::Client::new().map_err(Error::DBusClient)?;
+    let devs = bluez.devs().map_err(Error::KnownDevices)?;
 
     let listing = devs.iter().filter_map(|dev| {
         if !dev.filter_listing_by_status(&args.status) {
