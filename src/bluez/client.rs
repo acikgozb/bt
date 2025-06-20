@@ -97,12 +97,12 @@ pub struct Bluez {
 }
 
 impl Bluez {
-    pub fn new() -> zbus::Result<Self> {
+    pub fn new() -> Result<Self> {
         let connection = Connection::system()?;
         Ok(Self { connection })
     }
 
-    fn dev_object_iter(&self) -> zbus::Result<impl Iterator<Item = OwnedObjectPath>> {
+    fn dev_object_iter(&self) -> Result<impl Iterator<Item = OwnedObjectPath>> {
         let object_manager_proxy = ObjectManagerProxy::new(&self.connection, "org.bluez", "/")?;
         let objects = object_manager_proxy.get_managed_objects()?;
 
@@ -117,7 +117,7 @@ impl Bluez {
         Ok(dev_paths)
     }
 
-    fn build_proxy<'a, T>(&self, path: Option<&'a str>) -> zbus::Result<T>
+    fn build_proxy<'a, T>(&self, path: Option<&'a str>) -> Result<T>
     where
         T: zbus::blocking::proxy::ProxyImpl<'a> + From<zbus::Proxy<'a>>,
     {
@@ -130,14 +130,14 @@ impl Bluez {
         proxy_builder.build()
     }
 
-    pub fn power_state(&self) -> zbus::Result<BluezPowerState> {
+    pub fn power_state(&self) -> Result<BluezPowerState> {
         let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
         let result = adapter_proxy.power_state().map(BluezPowerState::from)?;
 
         Ok(result)
     }
 
-    pub fn toggle_power_state(&self) -> zbus::Result<BluezPowerState> {
+    pub fn toggle_power_state(&self) -> Result<BluezPowerState> {
         let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
         let prev_state = adapter_proxy.power_state().map(BluezPowerState::from)?;
 
@@ -147,7 +147,7 @@ impl Bluez {
         Ok(new_state)
     }
 
-    pub fn devs(&self) -> zbus::Result<Vec<BluezDev>> {
+    pub fn devs(&self) -> Result<Vec<BluezDev>> {
         let dev_object_iter = self.dev_object_iter()?;
 
         Ok(dev_object_iter
@@ -182,7 +182,7 @@ impl Bluez {
             .collect::<Vec<BluezDev>>())
     }
 
-    pub fn connect(&self, alias: &str) -> zbus::Result<()> {
+    pub fn connect(&self, alias: &str) -> Result<()> {
         let dev_paths = self.dev_object_iter()?;
 
         for dev_path in dev_paths {
@@ -197,28 +197,28 @@ impl Bluez {
         Err(zbus::Error::InterfaceNotFound)
     }
 
-    pub fn connected_devs(&self) -> zbus::Result<Vec<BluezDev>> {
+    pub fn connected_devs(&self) -> Result<Vec<BluezDev>> {
         let devs = self.devs()?;
 
         Ok(devs.into_iter().filter(|d| d.connected).collect())
     }
 
-    pub fn start_discovery(&self) -> zbus::Result<()> {
+    pub fn start_discovery(&self) -> Result<()> {
         let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
         adapter_proxy.start_discovery()
     }
 
-    pub fn stop_discovery(&self) -> zbus::Result<()> {
+    pub fn stop_discovery(&self) -> Result<()> {
         let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
         adapter_proxy.stop_discovery()
     }
 
-    pub fn scanned_devices(&self) -> zbus::Result<Vec<BluezDev>> {
+    pub fn scanned_devices(&self) -> Result<Vec<BluezDev>> {
         let devs = self.devs()?;
         Ok(devs.into_iter().filter(|d| d.rssi.is_some()).collect())
     }
 
-    pub fn remove(&self, alias: &str) -> zbus::Result<()> {
+    pub fn remove(&self, alias: &str) -> Result<()> {
         let mut dev_object_iter = self.dev_object_iter()?;
 
         let dev_object = dev_object_iter.find_map(|obj| {
@@ -240,7 +240,7 @@ impl Bluez {
         }
     }
 
-    pub fn disconnect(&self, alias: &str) -> zbus::Result<()> {
+    pub fn disconnect(&self, alias: &str) -> Result<()> {
         let mut dev_object_iter = self.dev_object_iter()?;
 
         let dev_proxy = dev_object_iter.find_map(|obj| {
@@ -261,3 +261,5 @@ impl Bluez {
         }
     }
 }
+
+pub type Result<T> = std::result::Result<T, zbus::Error>;
