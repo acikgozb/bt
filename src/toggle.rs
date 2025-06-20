@@ -31,8 +31,7 @@ impl From<io::Error> for Error {
     }
 }
 
-pub fn toggle(f: &mut impl io::Write) -> Result<(), Error> {
-    let bluez = bluez::Client::new().map_err(Error::DBusClient)?;
+pub fn toggle(bluez: &crate::BluezClient, f: &mut impl io::Write) -> Result<(), Error> {
     let toggled_power_state = bluez.toggle_power_state().map_err(Error::PowerState)?;
 
     let buf = format!("bluetooth: {}", toggled_power_state);

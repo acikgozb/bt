@@ -94,12 +94,18 @@ impl BluezDev {
 
 pub struct Bluez {
     connection: Connection,
+    adapter_proxy: BluezAdapterProxy<'static>,
 }
 
 impl Bluez {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<Self, Error> {
         let connection = Connection::system()?;
-        Ok(Self { connection })
+        let adapter_proxy = BluezAdapterProxy::new(&connection)?;
+
+        Ok(Self {
+            connection,
+            adapter_proxy,
+        })
     }
 
     fn dev_object_iter(&self) -> Result<impl Iterator<Item = OwnedObjectPath>> {
@@ -131,18 +137,22 @@ impl Bluez {
     }
 
     pub fn power_state(&self) -> Result<BluezPowerState> {
-        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
-        let result = adapter_proxy.power_state().map(BluezPowerState::from)?;
+        let result = self
+            .adapter_proxy
+            .power_state()
+            .map(BluezPowerState::from)?;
 
         Ok(result)
     }
 
     pub fn toggle_power_state(&self) -> Result<BluezPowerState> {
-        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
-        let prev_state = adapter_proxy.power_state().map(BluezPowerState::from)?;
+        let prev_state = self
+            .adapter_proxy
+            .power_state()
+            .map(BluezPowerState::from)?;
 
         let new_state = !prev_state;
-        adapter_proxy.set_powered(bool::from(&new_state))?;
+        self.adapter_proxy.set_powered(bool::from(&new_state))?;
 
         Ok(new_state)
     }
@@ -204,13 +214,11 @@ impl Bluez {
     }
 
     pub fn start_discovery(&self) -> Result<()> {
-        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
-        adapter_proxy.start_discovery()
+        self.adapter_proxy.start_discovery()
     }
 
     pub fn stop_discovery(&self) -> Result<()> {
-        let adapter_proxy: BluezAdapterProxy = self.build_proxy(None)?;
-        adapter_proxy.stop_discovery()
+        self.adapter_proxy.stop_discovery()
     }
 
     pub fn scanned_devices(&self) -> Result<Vec<BluezDev>> {
@@ -233,8 +241,7 @@ impl Bluez {
         });
 
         if let Some(dev_object) = dev_object {
-            let adapter_proxy = BluezAdapterProxy::new(&self.connection)?;
-            adapter_proxy.remove_device(dev_object)
+            self.adapter_proxy.remove_device(dev_object)
         } else {
             Err(zbus::Error::InterfaceNotFound)
         }

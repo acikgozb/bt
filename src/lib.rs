@@ -7,6 +7,7 @@ mod scan;
 mod status;
 mod toggle;
 
+pub use bluez::Client as BluezClient;
 pub use connect::connect;
 pub use disconnect::disconnect;
 pub use list_devices::list_devices;

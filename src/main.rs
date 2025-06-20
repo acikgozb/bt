@@ -17,6 +17,8 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<(), Box<dyn error::Error>> {
+    let bluez = bt::BluezClient::new()?;
+
     let args = Cli::parse();
 
     let mut stdout = io::stdout();
@@ -24,21 +26,21 @@ fn run() -> Result<(), Box<dyn error::Error>> {
 
     if let Some(subcommand) = args.command {
         match subcommand {
-            BtCommand::Status => bt::status(&mut stdout)?,
-            BtCommand::Toggle => bt::toggle(&mut stdout)?,
-            BtCommand::Scan { args } => bt::scan(&mut stdout, &args)?,
+            BtCommand::Status => bt::status(&bluez, &mut stdout)?,
+            BtCommand::Toggle => bt::toggle(&bluez, &mut stdout)?,
+            BtCommand::Scan { args } => bt::scan(&bluez, &mut stdout, &args)?,
             BtCommand::Connect { args } => {
-                let mut locked_stdin = stdin.lock();
-                bt::connect(&mut stdout, &mut locked_stdin, &args)?
+                let mut stdin_handle = stdin.lock();
+                bt::connect(&bluez, &mut stdout, &mut stdin_handle, &args)?
             }
             BtCommand::Disconnect { force, aliases } => {
-                let mut locked_stdin = stdin.lock();
-                bt::disconnect(&mut stdout, &mut locked_stdin, &force, &aliases)?
+                let mut stdin_handle = stdin.lock();
+                bt::disconnect(&bluez, &mut stdout, &mut stdin_handle, &force, &aliases)?
             }
-            BtCommand::ListDevices { args } => bt::list_devices(&mut stdout, &args)?,
+            BtCommand::ListDevices { args } => bt::list_devices(&bluez, &mut stdout, &args)?,
         }
     } else {
-        bt::status(&mut stdout)?
+        bt::status(&bluez, &mut stdout)?
     };
 
     Ok(())

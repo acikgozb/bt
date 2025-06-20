@@ -121,18 +121,17 @@ const LISTING_COLUMNS: [ConnectColumn; 3] = [
 ];
 
 pub fn connect(
+    bluez: &bluez::Client,
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
     args: &ConnectArgs,
 ) -> Result<(), Error> {
-    let bluez = bluez::Client::new().map_err(Error::DBusClient)?;
-
     let (alias, did_scan) = match &args.alias {
         Some(a) => (a, false),
         None => (
             &{
                 // TODO: Merge this fn with bt::scan after the formatting logic is finalized. Both of these are almost identical.
-                let devices = scan_devices(&bluez, &args.duration, &args.contains_name)?;
+                let devices = scan_devices(bluez, &args.duration, &args.contains_name)?;
 
                 read_device_alias(w, r, &devices)?
             },
