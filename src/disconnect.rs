@@ -6,7 +6,6 @@ use crate::bluez;
 
 #[derive(Debug)]
 pub enum Error {
-    DBusClient(bluez::Error),
     Disconnect(bluez::Error),
     Remove(bluez::Error),
     InvalidAlias,
@@ -17,9 +16,6 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::DBusClient(error) => {
-                write!(f, "unable to establish a D-Bus connection: {}", error)
-            }
             Error::Disconnect(error) => write!(f, "unable to disconnect: {}", error),
             Error::Remove(error) => write!(f, "unable to remove: {}", error),
             Error::InvalidAlias => write!(f, "the provided alias is invalid"),

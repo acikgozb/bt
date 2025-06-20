@@ -8,7 +8,6 @@ use crate::bluez;
 
 #[derive(Debug)]
 pub enum Error {
-    DBusClient(bluez::Error),
     KnownDevices(bluez::Error),
     Io(io::Error),
 }
@@ -16,9 +15,6 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::DBusClient(error) => {
-                write!(f, "unable to establish a D-Bus connection: {}", error)
-            }
             Error::KnownDevices(error) => {
                 write!(f, "unable to get known bluetooth devices: {}", error)
             }

@@ -5,7 +5,6 @@ use crate::bluez;
 #[derive(Debug)]
 pub enum Error {
     PowerState(bluez::Error),
-    DBusClient(bluez::Error),
     Io(io::Error),
 }
 
@@ -14,9 +13,6 @@ impl fmt::Display for Error {
         match &self {
             Error::PowerState(error) => {
                 write!(f, "unable to toggle device power state: {}", error)
-            }
-            Error::DBusClient(error) => {
-                write!(f, "unable to establish a D-Bus connection: {}", error)
             }
             Error::Io(error) => write!(f, "io error: {}", error),
         }

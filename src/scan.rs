@@ -8,7 +8,6 @@ use crate::bluez;
 
 #[derive(Debug)]
 pub enum Error {
-    DBusClient(bluez::Error),
     Start(bluez::Error),
     Stop(bluez::Error),
     DiscoveredDevices(bluez::Error),
@@ -18,9 +17,6 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::DBusClient(error) => {
-                write!(f, "unable to establish a DBus connection: {}", error)
-            }
             Error::Start(error) => write!(f, "unable to start device discovery: {}", error),
             Error::Stop(error) => write!(f, "unable to stop device discovery: {}", error),
             Error::DiscoveredDevices(error) => {
