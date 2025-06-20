@@ -80,16 +80,15 @@ impl Listable for bluez::Device {
 }
 
 pub fn disconnect(
+    bluez: &bluez::Client,
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
     force: &bool,
     aliases: &Option<Vec<String>>,
 ) -> Result<(), Error> {
-    let bluez = bluez::Client::new().map_err(Error::DBusClient)?;
-
     let aliases = match aliases.as_ref() {
         Some(aliases) => aliases,
-        None => &{ get_aliases_from_user(w, r, &bluez)? },
+        None => &{ get_aliases_from_user(w, r, bluez)? },
     };
 
     for alias in aliases {

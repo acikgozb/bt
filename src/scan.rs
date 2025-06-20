@@ -99,7 +99,11 @@ impl From<&ScanColumn> for String {
     }
 }
 
-pub fn scan(f: &mut impl io::Write, args: &ScanArgs) -> Result<(), Error> {
+pub fn scan(
+    bluez: &crate::BluezClient,
+    f: &mut impl io::Write,
+    args: &ScanArgs,
+) -> Result<(), Error> {
     let (out_format, listing_keys) = match (&args.columns, &args.values) {
         (None, None) => (ScanOutput::Pretty, &DEFAULT_LISTING_KEYS.to_vec()),
         (None, Some(v)) => (
@@ -119,8 +123,6 @@ pub fn scan(f: &mut impl io::Write, args: &ScanArgs) -> Result<(), Error> {
             },
         ),
     };
-
-    let bluez = bluez::Client::new().map_err(Error::DBusClient)?;
 
     bluez.start_discovery().map_err(Error::Start)?;
     thread::sleep(Duration::from_secs(u64::from(args.duration)));

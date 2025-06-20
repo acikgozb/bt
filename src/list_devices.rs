@@ -127,7 +127,11 @@ impl From<&ListDevicesColumn> for String {
     }
 }
 
-pub fn list_devices(f: &mut impl io::Write, args: &ListDevicesArgs) -> Result<(), Error> {
+pub fn list_devices(
+    bluez: &crate::BluezClient,
+    f: &mut impl io::Write,
+    args: &ListDevicesArgs,
+) -> Result<(), Error> {
     let (out_format, user_listing_keys) = match (&args.columns, &args.values) {
         (None, None) => (ListDevicesOutput::Pretty, None),
         (None, values) => (ListDevicesOutput::Terse, values.as_ref()),
@@ -139,7 +143,6 @@ pub fn list_devices(f: &mut impl io::Write, args: &ListDevicesArgs) -> Result<()
         None => &DEFAULT_LISTING_KEYS.to_vec(),
     };
 
-    let bluez = bluez::Client::new().map_err(Error::DBusClient)?;
     let devs = bluez.devs().map_err(Error::KnownDevices)?;
 
     let listing = devs.iter().filter_map(|dev| {
