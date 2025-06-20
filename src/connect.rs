@@ -1,9 +1,58 @@
-use std::{collections::BTreeMap, error, io, thread, time::Duration};
+use std::{collections::BTreeMap, error, fmt, io, num::ParseIntError, thread, time::Duration};
 
 use clap::Args;
 use tabled::{builder::Builder, settings::Style};
 
 use crate::bluez::{self};
+
+#[derive(Debug)]
+pub enum Error {
+    DBusClient(bluez::Error),
+    StartDiscovery(bluez::Error),
+    DiscoveredDevices(bluez::Error),
+    StopDiscovery(bluez::Error),
+    Connect(bluez::Error),
+    InvalidAlias,
+    Io(io::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::DBusClient(error) => {
+                write!(f, "unable to establish a D-Bus connection: {}", error)
+            }
+            Error::StartDiscovery(error) => {
+                write!(f, "unable to start device discovery: {}", error)
+            }
+            Error::DiscoveredDevices(error) => {
+                write!(f, "unable to get discovered devices: {}", error)
+            }
+            Error::StopDiscovery(error) => write!(f, "unable to stop device discovery: {}", error),
+            Error::Connect(error) => {
+                write!(f, "unable to connect to device: {}", error)
+            }
+            Error::InvalidAlias => {
+                write!(f, "the selected alias is not valid")
+            }
+            Error::Io(error) => write!(f, "io error: {}", error),
+        }
+    }
+}
+
+impl error::Error for Error {}
+
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        Self::Io(value)
+    }
+}
+
+impl From<ParseIntError> for Error {
+    fn from(_: ParseIntError) -> Self {
+        Self::InvalidAlias
+    }
+}
 
 #[derive(Debug, Args)]
 pub struct ConnectArgs {
@@ -75,8 +124,8 @@ pub fn connect(
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
     args: &ConnectArgs,
-) -> Result<(), Box<dyn error::Error>> {
-    let bluez = bluez::Client::new()?;
+) -> Result<(), Error> {
+    let bluez = bluez::Client::new().map_err(Error::DBusClient)?;
 
     let (alias, did_scan) = match &args.alias {
         Some(a) => (a, false),
@@ -91,13 +140,13 @@ pub fn connect(
         ),
     };
 
-    bluez.connect(alias)?;
+    bluez.connect(alias).map_err(Error::Connect)?;
 
     let out_buf = format!("connected to device: {}", alias);
     w.write_all(out_buf.as_bytes())?;
 
     if did_scan {
-        bluez.stop_discovery()?;
+        bluez.stop_discovery().map_err(Error::StopDiscovery)?;
     }
 
     Ok(())
@@ -107,13 +156,13 @@ fn scan_devices(
     bluez: &bluez::Client,
     duration: &Option<u8>,
     contains_name: &Option<String>,
-) -> Result<Vec<bluez::Device>, Box<dyn error::Error>> {
-    bluez.start_discovery()?;
+) -> Result<Vec<bluez::Device>, Error> {
+    bluez.start_discovery().map_err(Error::StartDiscovery)?;
 
     let scan_duration = u64::from(duration.unwrap_or(5));
     thread::sleep(Duration::from_secs(scan_duration));
 
-    let scan_result = bluez.scanned_devices()?;
+    let scan_result = bluez.scanned_devices().map_err(Error::DiscoveredDevices)?;
     Ok(match contains_name {
         Some(name) => scan_result
             .into_iter()
@@ -127,7 +176,7 @@ fn read_device_alias(
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
     devices: &[bluez::Device],
-) -> Result<String, Box<dyn error::Error>> {
+) -> Result<String, Error> {
     let mut device_map: BTreeMap<usize, &bluez::Device> =
         BTreeMap::from_iter(devices.iter().enumerate());
 
@@ -144,8 +193,9 @@ fn read_device_alias(
     r.read_line(&mut read_buf)?;
 
     let selected_idx = read_buf.trim().parse::<u8>()?;
-    // WARN: Once the errors are designed, replace this unwrap call accordingly.
-    let selected_device = device_map.remove(&(selected_idx as usize)).unwrap();
+    let selected_device = device_map
+        .remove(&(selected_idx as usize))
+        .ok_or(Error::InvalidAlias)?;
 
     Ok(selected_device.alias().to_string())
 }
