@@ -11,6 +11,7 @@ pub enum Error {
     Remove(bluez::Error),
     InvalidAlias,
     ConnectedDevices(bluez::Error),
+    NoConnectedDevices,
     Io(io::Error),
 }
 
@@ -24,6 +25,7 @@ impl fmt::Display for Error {
                 write!(f, "unable to get connected devices: {}", error)
             }
             Error::Io(error) => write!(f, "io error: {}", error),
+            Error::NoConnectedDevices => write!(f, "there are no connected devices to disconnect"),
         }
     }
 }
@@ -116,6 +118,9 @@ fn get_aliases_from_user(
     devices: Vec<bluez::Device>,
 ) -> Result<Vec<String>, Error> {
     let dev_len = devices.len();
+    if dev_len == 0 {
+        return Err(Error::NoConnectedDevices);
+    }
 
     let mut device_map = BTreeMap::from_iter(devices.into_iter().enumerate());
     let devices = device_map
