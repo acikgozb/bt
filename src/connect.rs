@@ -1,9 +1,11 @@
 use std::{collections::BTreeMap, error, fmt, io, num::ParseIntError, thread, time::Duration};
 
 use clap::Args;
-use tabled::{builder::Builder, settings::Style};
 
-use crate::bluez::{self};
+use crate::{
+    bluez::{self},
+    format::{PrettyFormatter, TableFormattable},
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -76,6 +78,7 @@ pub struct ConnectArgs {
 
 #[derive(Clone, Copy)]
 enum ConnectColumn {
+    Idx,
     Alias,
     Address,
     Rssi,
@@ -84,6 +87,7 @@ enum ConnectColumn {
 impl From<&ConnectColumn> for String {
     fn from(value: &ConnectColumn) -> Self {
         let str = match value {
+            ConnectColumn::Idx => "IDX",
             ConnectColumn::Alias => "ALIAS",
             ConnectColumn::Address => "ADDRESS",
             ConnectColumn::Rssi => "RSSI",
@@ -93,16 +97,13 @@ impl From<&ConnectColumn> for String {
     }
 }
 
-trait Listable {
-    fn get_listing_field_by_column(&self, column: &ConnectColumn) -> String;
-}
-
-impl Listable for bluez::Device {
-    fn get_listing_field_by_column(&self, column: &ConnectColumn) -> String {
+impl TableFormattable<ConnectColumn> for (&usize, &bluez::Device) {
+    fn get_cell_value_by_column(&self, column: &ConnectColumn) -> String {
         match column {
-            ConnectColumn::Alias => self.alias().to_string(),
-            ConnectColumn::Address => self.address().to_string(),
-            ConnectColumn::Rssi => match self.rssi() {
+            ConnectColumn::Idx => format!("({})", self.0),
+            ConnectColumn::Alias => self.1.alias().to_string(),
+            ConnectColumn::Address => self.1.address().to_string(),
+            ConnectColumn::Rssi => match self.1.rssi() {
                 Some(rssi) => rssi.to_string(),
                 None => "-".to_string(),
             },
@@ -110,7 +111,8 @@ impl Listable for bluez::Device {
     }
 }
 
-const LISTING_COLUMNS: [ConnectColumn; 3] = [
+const DEFAULT_LISTING_COLUMNS: [ConnectColumn; 4] = [
+    ConnectColumn::Idx,
     ConnectColumn::Alias,
     ConnectColumn::Address,
     ConnectColumn::Rssi,
@@ -126,10 +128,9 @@ pub fn connect(
         Some(a) => (a, false),
         None => (
             &{
-                // TODO: Merge this fn with bt::scan after the formatting logic is finalized. Both of these are almost identical.
                 let devices = scan_devices(bluez, &args.duration, &args.contains_name)?;
 
-                read_device_alias(w, r, &devices)?
+                read_device_alias(w, r, devices)?
             },
             true,
         ),
@@ -170,17 +171,17 @@ fn scan_devices(
 fn read_device_alias(
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
-    devices: &[bluez::Device],
+    devices: Vec<bluez::Device>,
 ) -> Result<String, Error> {
-    let mut device_map: BTreeMap<usize, &bluez::Device> =
-        BTreeMap::from_iter(devices.iter().enumerate());
+    let mut device_map: BTreeMap<usize, bluez::Device> =
+        BTreeMap::from_iter(devices.into_iter().enumerate());
 
-    let prompt = [
-        &create_device_list(&device_map),
-        "\n",
-        "Select the device you wish to connect: ",
-    ]
-    .concat();
+    let devices = device_map
+        .iter()
+        .to_pretty(&DEFAULT_LISTING_COLUMNS)
+        .to_string();
+
+    let prompt = [&devices, "\n", "Select the device you wish to connect: "].concat();
     w.write_all(prompt.as_bytes())?;
     w.flush()?;
 
@@ -193,27 +194,4 @@ fn read_device_alias(
         .ok_or(Error::InvalidAlias)?;
 
     Ok(selected_device.alias().to_string())
-}
-
-fn create_device_list(device_map: &BTreeMap<usize, &bluez::Device>) -> String {
-    let mut table_builder = Builder::new();
-
-    let mut columns = LISTING_COLUMNS.map(|c| String::from(&c)).to_vec();
-    columns.insert(0, "IDX".to_string());
-
-    table_builder.push_record(columns);
-
-    for (idx, dev) in device_map {
-        let mut row = LISTING_COLUMNS
-            .map(|c| dev.get_listing_field_by_column(&c))
-            .to_vec();
-        row.insert(0, format!("({})", idx));
-
-        table_builder.push_record(row);
-    }
-
-    let mut prompt = table_builder.build();
-    prompt.with(Style::blank());
-
-    prompt.to_string()
 }

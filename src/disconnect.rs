@@ -1,8 +1,9 @@
 use std::{collections::BTreeMap, error, fmt, io, num::ParseIntError};
 
-use tabled::{builder::Builder, settings::Style};
-
-use crate::bluez;
+use crate::{
+    bluez,
+    format::{PrettyFormatter, TableFormattable},
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -41,10 +42,15 @@ impl From<ParseIntError> for Error {
     }
 }
 
-const LISTING_COLUMNS: [DisconnectColumn; 2] = [DisconnectColumn::Alias, DisconnectColumn::Address];
+const DEFAULT_LISTING_COLUMNS: [DisconnectColumn; 3] = [
+    DisconnectColumn::Idx,
+    DisconnectColumn::Alias,
+    DisconnectColumn::Address,
+];
 
 #[derive(Copy, Clone)]
 enum DisconnectColumn {
+    Idx,
     Alias,
     Address,
 }
@@ -52,6 +58,7 @@ enum DisconnectColumn {
 impl From<&DisconnectColumn> for String {
     fn from(value: &DisconnectColumn) -> Self {
         let str = match value {
+            DisconnectColumn::Idx => "IDX",
             DisconnectColumn::Alias => "ALIAS",
             DisconnectColumn::Address => "ADDRESS",
         };
@@ -60,18 +67,13 @@ impl From<&DisconnectColumn> for String {
     }
 }
 
-trait Listable {
-    fn get_listing_field_by_column(&self, column: &DisconnectColumn) -> String;
-}
-
-impl Listable for bluez::Device {
-    fn get_listing_field_by_column(&self, column: &DisconnectColumn) -> String {
-        let str = match column {
-            DisconnectColumn::Alias => self.alias(),
-            DisconnectColumn::Address => self.address(),
-        };
-
-        str.to_string()
+impl TableFormattable<DisconnectColumn> for (&usize, &bluez::Device) {
+    fn get_cell_value_by_column(&self, column: &DisconnectColumn) -> String {
+        match column {
+            DisconnectColumn::Idx => self.0.to_string(),
+            DisconnectColumn::Alias => self.1.alias().to_string(),
+            DisconnectColumn::Address => self.1.address().to_string(),
+        }
     }
 }
 
@@ -84,7 +86,11 @@ pub fn disconnect(
 ) -> Result<(), Error> {
     let aliases = match aliases.as_ref() {
         Some(aliases) => aliases,
-        None => &{ get_aliases_from_user(w, r, bluez)? },
+        None => &{
+            let devices = bluez.connected_devs().map_err(Error::ConnectedDevices)?;
+
+            get_aliases_from_user(w, r, devices)?
+        },
     };
 
     for alias in aliases {
@@ -107,13 +113,18 @@ pub fn disconnect(
 fn get_aliases_from_user(
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
-    bluez: &bluez::Client,
+    devices: Vec<bluez::Device>,
 ) -> Result<Vec<String>, Error> {
-    let devices = bluez.connected_devs().map_err(Error::ConnectedDevices)?;
-    let mut device_map = BTreeMap::from_iter(devices.iter().enumerate());
+    let dev_len = devices.len();
+
+    let mut device_map = BTreeMap::from_iter(devices.into_iter().enumerate());
+    let devices = device_map
+        .iter()
+        .to_pretty(&DEFAULT_LISTING_COLUMNS)
+        .to_string();
 
     let prompt = [
-        &create_device_list(&device_map),
+        &devices,
         "\n",
         "Select the device(s) you wish to disconnect: ",
     ]
@@ -121,10 +132,10 @@ fn get_aliases_from_user(
     w.write_all(prompt.as_bytes())?;
     w.flush()?;
 
-    let mut answer = String::with_capacity(devices.len() * 2);
+    let mut answer = String::with_capacity(dev_len * 2);
     r.read_line(&mut answer)?;
 
-    let mut aliases: Vec<String> = Vec::with_capacity(devices.len());
+    let mut aliases: Vec<String> = Vec::with_capacity(dev_len);
     for idx in answer.split(",") {
         let idx = idx.trim().parse::<u8>()?;
         let device = device_map
@@ -134,27 +145,4 @@ fn get_aliases_from_user(
     }
 
     Ok(aliases)
-}
-
-fn create_device_list(device_map: &BTreeMap<usize, &bluez::Device>) -> String {
-    let mut table_builder = Builder::new();
-
-    let mut columns = LISTING_COLUMNS.map(|c| String::from(&c)).to_vec();
-    columns.insert(0, "IDX".to_string());
-
-    table_builder.push_record(columns);
-
-    for (idx, device) in device_map {
-        let mut record = LISTING_COLUMNS
-            .map(|c| device.get_listing_field_by_column(&c))
-            .to_vec();
-        record.insert(0, format!("({})", idx));
-
-        table_builder.push_record(record);
-    }
-
-    let mut list = table_builder.build();
-    list.with(Style::blank());
-
-    list.to_string()
 }
