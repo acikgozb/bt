@@ -80,7 +80,7 @@ impl TableFormattable<DisconnectColumn> for (&usize, &bluez::Device) {
 }
 
 pub fn disconnect(
-    bluez: &bluez::Client,
+    bluez: &crate::BluezClient,
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
     force: &bool,
@@ -89,7 +89,7 @@ pub fn disconnect(
     let aliases = match aliases.as_ref() {
         Some(aliases) => aliases,
         None => &{
-            let devices = bluez.connected_devs().map_err(Error::ConnectedDevices)?;
+            let devices = bluez.connected_devices().map_err(Error::ConnectedDevices)?;
 
             get_aliases_from_user(w, r, devices)?
         },

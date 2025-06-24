@@ -119,7 +119,7 @@ const DEFAULT_LISTING_COLUMNS: [ConnectColumn; 4] = [
 ];
 
 pub fn connect(
-    bluez: &bluez::Client,
+    bluez: &crate::BluezClient,
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
     args: &ConnectArgs,
@@ -149,7 +149,7 @@ pub fn connect(
 }
 
 fn scan_devices(
-    bluez: &bluez::Client,
+    bluez: &crate::BluezClient,
     duration: &Option<u8>,
     contains_name: &Option<String>,
 ) -> Result<Vec<bluez::Device>, Error> {

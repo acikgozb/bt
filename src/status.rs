@@ -33,7 +33,7 @@ impl From<io::Error> for Error {
 
 pub fn status(bluez: &crate::BluezClient, f: &mut impl io::Write) -> Result<(), Error> {
     let power_state = bluez.power_state().map_err(Error::PowerState)?;
-    let connected_devs = bluez.connected_devs().map_err(Error::ConnectedDevices)?;
+    let connected_devs = bluez.connected_devices().map_err(Error::ConnectedDevices)?;
 
     let mut buf = [
         "bluetooth: ",
@@ -54,4 +54,31 @@ pub fn status(bluez: &crate::BluezClient, f: &mut impl io::Write) -> Result<(), 
     f.write_all(buf.as_bytes())?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn it_should_write_bluetooth_status() {
+        let bluez = crate::BluezClient::new().unwrap();
+        let mut out_buf = Cursor::new(vec![]);
+
+        status(&bluez, &mut out_buf).unwrap();
+
+        let connected_device = &bluez.connected_devices().unwrap()[0];
+        let expected = format!(
+            "bluetooth: enabled\nconnected devices: \n{}/{} (batt: %{})",
+            connected_device.alias(),
+            connected_device.address(),
+            connected_device.battery().unwrap()
+        );
+
+        let result = String::from_utf8(out_buf.into_inner()).unwrap();
+
+        assert_eq!(expected, result)
+    }
 }
