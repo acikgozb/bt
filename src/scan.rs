@@ -2,9 +2,11 @@ use core::fmt;
 use std::{error, io, thread, time::Duration};
 
 use clap::Args;
-use tabled::{builder::Builder, settings::Style};
 
-use crate::bluez;
+use crate::{
+    bluez,
+    format::{PrettyFormatter, TableFormattable, TerseFormatter},
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -69,13 +71,9 @@ enum ScanOutput {
     Terse,
 }
 
-pub trait Listable {
-    fn get_listing_field_by_column(&self, value: &ScanColumn) -> String;
-}
-
-impl Listable for bluez::Device {
-    fn get_listing_field_by_column(&self, value: &ScanColumn) -> String {
-        match value {
+impl TableFormattable<ScanColumn> for bluez::Device {
+    fn get_cell_value_by_column(&self, column: &ScanColumn) -> String {
+        match column {
             ScanColumn::Alias => self.alias().to_string(),
             ScanColumn::Address => self.address().to_string(),
             ScanColumn::Rssi => self.rssi().unwrap_or(0).to_string(),
@@ -125,16 +123,10 @@ pub fn scan(
 
     let scanned_devices = bluez.scanned_devices().map_err(Error::DiscoveredDevices)?;
 
-    let listing = scanned_devices.iter().map(|d| {
-        listing_keys
-            .iter()
-            .map(|k| d.get_listing_field_by_column(k))
-            .collect::<Vec<String>>()
-    });
-
+    let devices_iter = scanned_devices.into_iter();
     let out_buf = match out_format {
-        ScanOutput::Pretty => create_pretty_out(listing, listing_keys),
-        ScanOutput::Terse => create_terse_out(listing),
+        ScanOutput::Pretty => devices_iter.to_pretty(listing_keys).to_string(),
+        ScanOutput::Terse => devices_iter.to_terse(listing_keys).to_string(),
     };
 
     f.write_all(out_buf.as_bytes())?;
@@ -142,31 +134,4 @@ pub fn scan(
     bluez.stop_discovery().map_err(Error::Stop)?;
 
     Ok(())
-}
-
-pub fn create_pretty_out(
-    listing: impl Iterator<Item = Vec<String>>,
-    columns: &[ScanColumn],
-) -> String {
-    let mut builder = Builder::default();
-
-    builder.push_record(columns);
-    for row in listing {
-        builder.push_record(row);
-    }
-
-    let mut table = builder.build();
-    table.with(Style::blank());
-
-    format!("{}", table)
-}
-
-pub fn create_terse_out(listing: impl Iterator<Item = Vec<String>>) -> String {
-    listing
-        .map(|l| {
-            let mut terse_str = l.join("/");
-            terse_str.push('\n');
-            terse_str
-        })
-        .collect()
 }
