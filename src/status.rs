@@ -55,3 +55,30 @@ pub fn status(bluez: &crate::BluezClient, f: &mut impl io::Write) -> Result<(), 
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn it_should_write_bluetooth_status() {
+        let bluez = crate::BluezClient::new().unwrap();
+        let mut out_buf = Cursor::new(vec![]);
+
+        status(&bluez, &mut out_buf).unwrap();
+
+        let connected_device = &bluez.connected_devices().unwrap()[0];
+        let expected = format!(
+            "bluetooth: enabled\nconnected devices: \n{}/{} (batt: %{})",
+            connected_device.alias(),
+            connected_device.address(),
+            connected_device.battery().unwrap()
+        );
+
+        let result = String::from_utf8(out_buf.into_inner()).unwrap();
+
+        assert_eq!(expected, result)
+    }
+}
