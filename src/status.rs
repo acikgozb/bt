@@ -33,7 +33,7 @@ impl From<io::Error> for Error {
 
 pub fn status(bluez: &crate::BluezClient, f: &mut impl io::Write) -> Result<(), Error> {
     let power_state = bluez.power_state().map_err(Error::PowerState)?;
-    let connected_devs = bluez.connected_devs().map_err(Error::ConnectedDevices)?;
+    let connected_devs = bluez.connected_devices().map_err(Error::ConnectedDevices)?;
 
     let mut buf = [
         "bluetooth: ",

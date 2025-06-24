@@ -138,7 +138,7 @@ pub fn list_devices(
         None => &DEFAULT_LISTING_COLUMNS.to_vec(),
     };
 
-    let devices = bluez.devs().map_err(Error::KnownDevices)?;
+    let devices = bluez.devices().map_err(Error::KnownDevices)?;
     let devices = devices.into_iter().filter(|d| match &args.status {
         Some(s) => d.filter_cell_value_by_status(s),
         None => true,

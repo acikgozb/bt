@@ -180,7 +180,7 @@ impl BluezDBusClient {
         Ok(new_state)
     }
 
-    pub fn devs(&self) -> zbus::Result<Vec<BluezDev>> {
+    pub fn devices(&self) -> zbus::Result<Vec<BluezDev>> {
         let dev_object_iter = self.dev_object_iter()?;
 
         Ok(dev_object_iter
@@ -230,8 +230,8 @@ impl BluezDBusClient {
         Err(zbus::Error::InterfaceNotFound)
     }
 
-    pub fn connected_devs(&self) -> zbus::Result<Vec<BluezDev>> {
-        let devs = self.devs()?;
+    pub fn connected_devices(&self) -> zbus::Result<Vec<BluezDev>> {
+        let devs = self.devices()?;
 
         Ok(devs.into_iter().filter(|d| d.connected).collect())
     }
@@ -245,7 +245,7 @@ impl BluezDBusClient {
     }
 
     pub fn scanned_devices(&self) -> zbus::Result<Vec<BluezDev>> {
-        let devs = self.devs()?;
+        let devs = self.devices()?;
         Ok(devs.into_iter().filter(|d| d.rssi.is_some()).collect())
     }
 
