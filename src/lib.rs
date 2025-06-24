@@ -2,6 +2,7 @@ pub mod api;
 mod bluez;
 mod connect;
 mod disconnect;
+mod format;
 mod list_devices;
 mod scan;
 mod status;
