@@ -114,12 +114,12 @@ impl From<zbus::Error> for Error {
     }
 }
 
-pub struct Bluez {
+pub struct BluezDBusClient {
     connection: Connection,
     adapter_proxy: BluezAdapterProxy<'static>,
 }
 
-impl Bluez {
+impl BluezDBusClient {
     pub fn new() -> Result<Self, Error> {
         let connection = Connection::system()?;
         let adapter_proxy = BluezAdapterProxy::new(&connection)?;
@@ -288,6 +288,153 @@ impl Bluez {
             dev_proxy.disconnect()
         } else {
             Err(zbus::Error::InterfaceNotFound)
+        }
+    }
+}
+
+pub struct BluezTestClient {
+    erred_method_name: Option<String>,
+    err: zbus::Error,
+}
+
+impl BluezTestClient {
+    pub fn new() -> Result<Self, Error> {
+        Ok(Self {
+            erred_method_name: None,
+            err: zbus::Error::InvalidReply,
+        })
+    }
+
+    pub fn set_erred_method_name(&mut self, name: String) {
+        self.erred_method_name = Some(name);
+    }
+
+    pub fn power_state(&self) -> zbus::Result<BluezPowerState> {
+        let err_key = String::from("power_state");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => Ok(BluezPowerState::On),
+        }
+    }
+
+    pub fn toggle_power_state(&self) -> zbus::Result<BluezPowerState> {
+        let err_key = String::from("toggle_power_state");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => Ok(BluezPowerState::On),
+        }
+    }
+
+    pub fn devices(&self) -> zbus::Result<Vec<BluezDev>> {
+        let err_key = String::from("devices");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => {
+                let device = BluezDev {
+                    alias: String::from("test_dev"),
+                    address: String::from("XX:XX:XX:XX:XX:XX"),
+                    connected: true,
+                    paired: true,
+                    trusted: true,
+                    bonded: false,
+                    battery: Some(50),
+                    rssi: None,
+                };
+
+                Ok(vec![device])
+            }
+        }
+    }
+
+    pub fn connect(&self, _: &str) -> zbus::Result<()> {
+        let err_key = String::from("connect");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn connected_devices(&self) -> zbus::Result<Vec<BluezDev>> {
+        let err_key = String::from("connected_devices");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => {
+                let device = BluezDev {
+                    alias: String::from("test_dev"),
+                    address: String::from("XX:XX:XX:XX:XX:XX"),
+                    connected: true,
+                    paired: true,
+                    trusted: true,
+                    bonded: false,
+                    battery: Some(50),
+                    rssi: None,
+                };
+
+                Ok(vec![device])
+            }
+        }
+    }
+
+    pub fn start_discovery(&self) -> zbus::Result<()> {
+        let err_key = String::from("start_discovery");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn stop_discovery(&self) -> zbus::Result<()> {
+        let err_key = String::from("stop_discovery");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn scanned_devices(&self) -> zbus::Result<Vec<BluezDev>> {
+        let err_key = String::from("scanned_devices");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => {
+                let device = BluezDev {
+                    alias: String::from("test_dev"),
+                    address: String::from("XX:XX:XX:XX:XX:XX"),
+                    connected: true,
+                    paired: true,
+                    trusted: true,
+                    bonded: false,
+                    battery: None,
+                    rssi: Some(50),
+                };
+
+                Ok(vec![device])
+            }
+        }
+    }
+
+    pub fn remove(&self, _: &str) -> zbus::Result<()> {
+        let err_key = String::from("remove");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn disconnect(&self, _: &str) -> zbus::Result<()> {
+        let err_key = String::from("disconnect");
+
+        match &self.erred_method_name {
+            Some(v) if v == &err_key => Err(self.err.clone()),
+            _ => Ok(()),
         }
     }
 }

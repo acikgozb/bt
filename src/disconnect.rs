@@ -80,7 +80,7 @@ impl TableFormattable<DisconnectColumn> for (&usize, &bluez::Device) {
 }
 
 pub fn disconnect(
-    bluez: &bluez::Client,
+    bluez: &crate::BluezClient,
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
     force: &bool,
