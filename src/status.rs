@@ -51,7 +51,7 @@ impl From<io::Error> for Error {
 ///
 /// The Bluetooth adapter status and Device-MAC address pairs are written to the provided [`io::Write`].
 ///
-/// The format of the WiFi status depends on [`BluezClient`].
+/// The format of the Bluetooth status depends on [`BluezClient`].
 ///
 /// The format of the Device-MAC address pairs is like below:
 ///
@@ -92,7 +92,7 @@ impl From<io::Error> for Error {
 ///
 /// assert!(status_result.is_ok());
 /// let status_str = String::from_utf8(output.into_inner()).unwrap();
-/// assert_eq!(status_output, "bluetooth: enabled\nconnected devices:\nDev1/Addr1\nDev2/Addr2");
+/// assert_eq!(status_str, "bluetooth: enabled\nconnected devices:\nDev1/Addr1\nDev2/Addr2");
 ///```
 ///
 /// Here is an error case. The example triggers an [`io::Error`] by passing an array as a buffer, instead of a growable buffer.
