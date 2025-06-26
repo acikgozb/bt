@@ -151,3 +151,175 @@ fn get_aliases_from_user(
 
     Ok(aliases)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use io::Cursor;
+
+    #[test]
+    fn it_should_disconnect_if_not_forced() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        // NOTE: The Bluez remove is set to err to see that it is not
+        // executed by checking res.is_ok().
+        bluez.set_erred_method_name("remove".to_string());
+
+        let force = false;
+
+        for aliases in [None, Some(vec!["connected_device".to_string()])] {
+            let mut in_buf = match aliases {
+                Some(_) => Cursor::new(vec![]),
+                None => {
+                    let user_device_selection = String::from("0\n");
+                    Cursor::new(user_device_selection.as_bytes().to_vec())
+                }
+            };
+            let mut out_buf = Cursor::new(vec![]);
+
+            let result = disconnect(&bluez, &mut out_buf, &mut in_buf, &force, &aliases);
+
+            assert!(result.is_ok());
+            assert!(!out_buf.into_inner().is_empty());
+        }
+    }
+
+    #[test]
+    fn it_should_remove_if_forced() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        // NOTE: The Bluez disconnect is set to err to see that it is not
+        // executed by checking res.is_ok().
+        bluez.set_erred_method_name("disconnect".to_string());
+
+        let force = true;
+
+        for aliases in [None, Some(vec!["connected_device".to_string()])] {
+            let mut in_buf = match aliases {
+                Some(_) => Cursor::new(vec![]),
+                None => {
+                    let user_device_selection = String::from("0\n");
+                    Cursor::new(user_device_selection.as_bytes().to_vec())
+                }
+            };
+            let mut out_buf = Cursor::new(vec![]);
+
+            let result = disconnect(&bluez, &mut out_buf, &mut in_buf, &force, &aliases);
+
+            assert!(result.is_ok());
+            assert!(!out_buf.into_inner().is_empty());
+        }
+    }
+
+    #[test]
+    fn is_should_show_known_devices_if_alias_is_not_provided() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let user_device_selection = String::from("0\n");
+        let mut in_buf = Cursor::new(user_device_selection.as_bytes().to_vec());
+        let mut out_buf = Cursor::new(vec![]);
+        let force = false;
+        let aliases = None;
+
+        let result = disconnect(&bluez, &mut out_buf, &mut in_buf, &force, &aliases);
+
+        assert!(result.is_ok());
+
+        let out_buf = out_buf.into_inner();
+        assert!(!out_buf.is_empty());
+
+        // NOTE: If known devs are shown, that means the output consists of multiple lines.
+        assert!(out_buf.split(|b| b == &b'\n').count() > 1)
+    }
+
+    #[test]
+    fn it_should_fail_when_it_cannot_get_known_devices() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("connected_devices".to_string());
+
+        let user_device_selection = String::from("0\n");
+        let mut in_buf = Cursor::new(user_device_selection.as_bytes().to_vec());
+        let mut out_buf = Cursor::new(vec![]);
+        let force = false;
+        let aliases = None;
+
+        let result = disconnect(&bluez, &mut out_buf, &mut in_buf, &force, &aliases);
+
+        assert!(result.is_err());
+
+        let out_buf = out_buf.into_inner();
+        assert!(out_buf.is_empty());
+    }
+
+    #[test]
+    fn it_should_fail_when_it_cannot_disconnect() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("disconnect".to_string());
+
+        let force = false;
+
+        for aliases in [None, Some(vec!["connected_device".to_string()])] {
+            let mut in_buf = match aliases {
+                Some(_) => Cursor::new(vec![]),
+                None => {
+                    let user_device_selection = String::from("0\n");
+                    Cursor::new(user_device_selection.as_bytes().to_vec())
+                }
+            };
+            let mut out_buf = Cursor::new(vec![]);
+
+            let result = disconnect(&bluez, &mut out_buf, &mut in_buf, &force, &aliases);
+
+            assert!(result.is_err());
+
+            if aliases.is_some() {
+                assert!(out_buf.into_inner().is_empty());
+            } else {
+                assert!(!out_buf.into_inner().is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn it_should_fail_when_it_cannot_remove() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("remove".to_string());
+
+        let force = true;
+
+        for aliases in [None, Some(vec!["connected_device".to_string()])] {
+            let mut in_buf = match aliases {
+                Some(_) => Cursor::new(vec![]),
+                None => {
+                    let user_device_selection = String::from("0\n");
+                    Cursor::new(user_device_selection.as_bytes().to_vec())
+                }
+            };
+            let mut out_buf = Cursor::new(vec![]);
+
+            let result = disconnect(&bluez, &mut out_buf, &mut in_buf, &force, &aliases);
+
+            assert!(result.is_err());
+
+            if aliases.is_some() {
+                assert!(out_buf.into_inner().is_empty());
+            } else {
+                assert!(!out_buf.into_inner().is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn it_should_fail_when_result_cannot_be_written_to_buf() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let mut in_buf = Cursor::new([]);
+        let mut out_buf = Cursor::new([]);
+        out_buf.set_position(1);
+        let force = false;
+        let aliases = Some(vec!["connected_device".to_string()]);
+
+        let result = disconnect(&bluez, &mut out_buf, &mut in_buf, &force, &aliases);
+
+        assert!(result.is_err());
+        assert!(out_buf.into_inner().is_empty())
+    }
+}

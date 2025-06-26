@@ -135,3 +135,102 @@ pub fn scan(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use io::Cursor;
+
+    #[test]
+    fn it_should_write_scanned_devices() {
+        let bluez = crate::BluezClient::new().unwrap();
+        let mut out_buf = Cursor::new(vec![]);
+
+        let scan_args = ScanArgs {
+            duration: 0,
+            columns: None,
+            values: None,
+        };
+
+        let result = scan(&bluez, &mut out_buf, &scan_args);
+
+        assert!(result.is_ok());
+        assert!(!out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_fail_when_scan_is_not_started() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("start_discovery".to_string());
+
+        let mut out_buf = Cursor::new(vec![]);
+
+        let scan_args = ScanArgs {
+            duration: 0,
+            columns: None,
+            values: None,
+        };
+
+        let result = scan(&bluez, &mut out_buf, &scan_args);
+
+        assert!(result.is_err());
+        assert!(out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_fail_when_scanned_devices_are_not_read() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("scanned_devices".to_string());
+
+        let mut out_buf = Cursor::new(vec![]);
+
+        let scan_args = ScanArgs {
+            duration: 0,
+            columns: None,
+            values: None,
+        };
+
+        let result = scan(&bluez, &mut out_buf, &scan_args);
+
+        assert!(result.is_err());
+        assert!(out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_fail_when_scan_is_not_stopped() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("stop_discovery".to_string());
+
+        let mut out_buf = Cursor::new(vec![]);
+
+        let scan_args = ScanArgs {
+            duration: 0,
+            columns: None,
+            values: None,
+        };
+
+        let result = scan(&bluez, &mut out_buf, &scan_args);
+
+        assert!(result.is_err());
+        assert!(!out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_fail_when_result_cannot_be_written_to_buf() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let mut out_buf = Cursor::new([]);
+        out_buf.set_position(1);
+
+        let scan_args = ScanArgs {
+            duration: 0,
+            columns: None,
+            values: None,
+        };
+
+        let result = scan(&bluez, &mut out_buf, &scan_args);
+
+        assert!(result.is_err());
+        assert!(out_buf.into_inner().is_empty())
+    }
+}
