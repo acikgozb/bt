@@ -195,3 +195,122 @@ fn read_device_alias(
 
     Ok(selected_device.alias().to_string())
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use io::Cursor;
+
+    #[test]
+    fn it_should_connect_without_scanning_if_alias_is_provided() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        // NOTE: The Bluez scan is set to err to see that scan is not
+        // executed by checking res.is_ok().
+        bluez.set_erred_method_name("start_discovery".to_string());
+
+        let mut in_buf = Cursor::new([]);
+        let mut out_buf = Cursor::new(vec![]);
+
+        let connect_args = ConnectArgs {
+            duration: Some(0),
+            contains_name: None,
+            alias: Some("known_dev".to_string()),
+        };
+
+        let result = connect(&bluez, &mut out_buf, &mut in_buf, &connect_args);
+
+        assert!(result.is_ok());
+        assert!(!out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_run_a_scan_before_connecting_if_alias_is_not_provided() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let mut out_buf = Cursor::new(vec![]);
+
+        let user_scan_selection = String::from("0\n");
+        let mut in_buf = Cursor::new(user_scan_selection.as_bytes().to_vec());
+
+        let connect_args = ConnectArgs {
+            duration: Some(0),
+            contains_name: None,
+            alias: None,
+        };
+
+        let result = connect(&bluez, &mut out_buf, &mut in_buf, &connect_args);
+
+        assert!(result.is_ok());
+        assert!(!out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_fail_if_interactive_scan_fails() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+
+        let user_scan_selection = String::from("0\n");
+        let mut in_buf = Cursor::new(user_scan_selection.as_bytes().to_vec());
+
+        let connect_args = ConnectArgs {
+            duration: Some(0),
+            contains_name: None,
+            alias: None,
+        };
+
+        for scan_err in ["start_discovery", "scanned_devices", "stop_discovery"] {
+            bluez.set_erred_method_name(scan_err.to_string());
+            let mut out_buf = Cursor::new(vec![]);
+
+            let result = connect(&bluez, &mut out_buf, &mut in_buf, &connect_args);
+
+            assert!(result.is_err());
+
+            if scan_err != "stop_discovery" {
+                assert!(out_buf.into_inner().is_empty());
+            } else {
+                assert!(!out_buf.into_inner().is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn it_should_fail_if_connect_fails() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("connect".to_string());
+
+        let mut in_buf = Cursor::new([]);
+        let mut out_buf = Cursor::new(vec![]);
+
+        let connect_args = ConnectArgs {
+            duration: Some(0),
+            contains_name: None,
+            alias: Some("known_dev".to_string()),
+        };
+
+        let result = connect(&bluez, &mut out_buf, &mut in_buf, &connect_args);
+
+        assert!(result.is_err());
+        assert!(out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_fail_when_result_cannot_be_written_to_buf() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let mut in_buf = Cursor::new([]);
+        let mut out_buf = Cursor::new([]);
+        out_buf.set_position(1);
+
+        let connect_args = ConnectArgs {
+            duration: Some(0),
+            contains_name: None,
+            alias: Some("known_dev".to_string()),
+        };
+
+        let result = connect(&bluez, &mut out_buf, &mut in_buf, &connect_args);
+
+        assert!(result.is_err());
+        assert!(out_buf.into_inner().is_empty())
+    }
+}
