@@ -81,4 +81,40 @@ mod tests {
 
         assert_eq!(expected, result)
     }
+
+    #[test]
+    fn it_should_fail_if_power_state_cannot_be_read() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("power_state".to_string());
+
+        let mut out_buf = Cursor::new(vec![]);
+
+        let result = status(&bluez, &mut out_buf);
+
+        assert!(result.is_err())
+    }
+
+    #[test]
+    fn it_should_fail_if_connected_devices_cannot_be_read() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("connected_devices".to_string());
+
+        let mut out_buf = Cursor::new(vec![]);
+
+        let result = status(&bluez, &mut out_buf);
+
+        assert!(result.is_err())
+    }
+
+    #[test]
+    fn it_should_fail_when_result_cannot_be_written_to_buf() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let mut out_buf = Cursor::new([]);
+        out_buf.set_position(1);
+
+        let result = status(&bluez, &mut out_buf);
+
+        assert!(result.is_err())
+    }
 }
