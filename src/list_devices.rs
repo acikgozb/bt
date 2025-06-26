@@ -153,3 +153,95 @@ pub fn list_devices(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::vec;
+
+    use crate::list_devices;
+
+    use super::*;
+    use io::Cursor;
+
+    #[test]
+    fn it_should_show_devices() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let mut out_buf = Cursor::new(vec![]);
+
+        let args = ListDevicesArgs {
+            columns: None,
+            values: None,
+            status: None,
+        };
+
+        let result = list_devices(&bluez, &mut out_buf, &args);
+
+        assert!(result.is_ok());
+        assert!(!out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_fail_if_it_cannot_get_known_devices() {
+        let mut bluez = crate::BluezClient::new().unwrap();
+        bluez.set_erred_method_name("devices".to_string());
+
+        let mut out_buf = Cursor::new(vec![]);
+
+        let args = ListDevicesArgs {
+            columns: None,
+            values: None,
+            status: None,
+        };
+
+        let result = list_devices(&bluez, &mut out_buf, &args);
+
+        assert!(result.is_err());
+        assert!(out_buf.into_inner().is_empty());
+    }
+
+    #[test]
+    fn it_should_filter_devices_based_on_status() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let mut unfiltered_out_buf = Cursor::new(vec![]);
+        let mut filtered_out_buf = Cursor::new(vec![]);
+
+        let mut args = ListDevicesArgs {
+            columns: None,
+            values: None,
+            status: None,
+        };
+
+        let result = list_devices(&bluez, &mut unfiltered_out_buf, &args);
+        assert!(result.is_ok());
+        let unfiltered_len = unfiltered_out_buf.into_inner().len();
+
+        // NOTE: There are no bonded devices returning from BluezTestClient.
+        args.status = Some(DeviceStatus::Bonded);
+
+        let result = list_devices(&bluez, &mut filtered_out_buf, &args);
+        assert!(result.is_ok());
+        let filtered_len = filtered_out_buf.into_inner().len();
+
+        assert!(unfiltered_len > filtered_len);
+    }
+
+    #[test]
+    fn it_should_fail_when_result_cannot_be_written_to_buf() {
+        let bluez = crate::BluezClient::new().unwrap();
+
+        let mut out_buf = Cursor::new([]);
+
+        let args = ListDevicesArgs {
+            columns: None,
+            values: None,
+            status: None,
+        };
+
+        let result = list_devices(&bluez, &mut out_buf, &args);
+
+        assert!(result.is_err());
+        assert!(out_buf.into_inner().is_empty())
+    }
+}
