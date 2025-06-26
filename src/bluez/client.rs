@@ -145,20 +145,6 @@ impl BluezDBusClient {
         Ok(dev_paths)
     }
 
-    // FIXME: No need for this at all, use proxy::new in approp places.
-    fn build_proxy<'a, T>(&self, path: Option<&'a str>) -> zbus::Result<T>
-    where
-        T: zbus::blocking::proxy::ProxyImpl<'a> + From<zbus::Proxy<'a>>,
-    {
-        let mut proxy_builder = T::builder(&self.connection);
-
-        if let Some(path) = path {
-            proxy_builder = proxy_builder.path(path)?;
-        }
-
-        proxy_builder.build()
-    }
-
     pub fn power_state(&self) -> zbus::Result<BluezPowerState> {
         let result = self
             .adapter_proxy
@@ -185,7 +171,7 @@ impl BluezDBusClient {
 
         Ok(dev_object_iter
             .filter_map(|dev_path| {
-                let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path)).ok()?;
+                let dev_proxy = BluezDeviceProxy::new(&self.connection, &dev_path).ok()?;
 
                 let mut dev = BluezDev {
                     alias: dev_proxy.alias().ok()?,
@@ -206,8 +192,8 @@ impl BluezDBusClient {
                     return Some(dev);
                 }
 
-                let battery_proxy: BluezDeviceBatteryProxy =
-                    self.build_proxy(Some(&dev_path)).ok()?;
+                let battery_proxy =
+                    BluezDeviceBatteryProxy::new(&self.connection, &dev_path).ok()?;
                 dev.battery = Some(battery_proxy.percentage().ok()?);
 
                 Some(dev)
@@ -219,7 +205,7 @@ impl BluezDBusClient {
         let dev_paths = self.dev_object_iter()?;
 
         for dev_path in dev_paths {
-            let dev_proxy: BluezDeviceProxy = self.build_proxy(Some(&dev_path))?;
+            let dev_proxy = BluezDeviceProxy::new(&self.connection, &dev_path)?;
 
             let dev_alias = dev_proxy.alias()?;
             if dev_alias == alias {
