@@ -14,4 +14,4 @@ pub use disconnect::disconnect;
 pub use list_devices::list_devices;
 pub use scan::scan;
 pub use status::{Error as StatusError, status};
-pub use toggle::toggle;
+pub use toggle::{Error as ToggleError, toggle};

@@ -2,9 +2,22 @@ use std::{error, fmt, io};
 
 use crate::bluez;
 
+/// Defines error variants that may be returned from a [`toggle`] call.
+///
+/// [`toggle`]: crate::toggle
 #[derive(Debug)]
 pub enum Error {
+    /// Happens when the power state of the Bluetooth adapter could not be read.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
     PowerState(bluez::Error),
+
+    /// Happens when the result of [`toggle`] could not be written to the given buffer.
+    /// It holds the underlying [`io::Error`].
+    ///
+    /// [`toggle`]: crate::toggle
+    /// [`io::Error`]: std::io::Error
     Io(io::Error),
 }
 
@@ -27,6 +40,59 @@ impl From<io::Error> for Error {
     }
 }
 
+/// Provides the ability of toggling the Bluetooth adapter status by using a [`BluezClient`].
+///
+/// The updated Bluetooth adapter status is written to the provided [`io::Write`].
+///
+/// The format of the Bluetooth status depends on [`BluezClient`].
+///
+/// # Panics
+///
+/// This function does not panic.
+///
+/// # Errors
+///
+/// This function can return all variants of [`ToggleError`] based on given conditions. For more details, please see the error documentation.
+///
+/// [`BluezClient`]: crate::BluezClient
+/// [`io::Write`]: std::io::Write
+/// [`ToggleError`]: crate::ToggleError
+/// [`toggle`]: crate::toggle
+///
+/// # Examples
+///
+/// Here is a basic [`toggle`] call. The output assertion is done to show the format of the success result. The actual output will contain the exact same state of your Bluetooth adapter after the toggle.
+///
+/// ```no_run
+/// use std::io::Cursor;
+/// use bt::{toggle, BluezClient};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new(vec![]);
+///
+/// let toggle_result = toggle(&bluez_client, &mut output);
+///
+/// assert!(toggle_result.is_ok());
+/// let toggle_str = String::from_utf8(output.into_inner()).unwrap();
+/// assert_eq!(toggle_str, "bluetooth: disabled");
+///```
+///
+/// Here is an error case. The example triggers an [`io::Error`] by passing an array as a buffer, instead of a growable buffer.
+///
+/// ```no_run
+/// use std::io::Cursor;
+/// use bt::{toggle, BluezClient, ToggleError};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new([]);
+///
+/// let toggle_result = toggle(&bluez_client, &mut output);
+///
+/// match toggle_result {
+///     Err(ToggleError::Io(err)) => eprintln!("{}", err),
+///     _ => unreachable!(),
+/// }
+///```
 pub fn toggle(bluez: &crate::BluezClient, f: &mut impl io::Write) -> Result<(), Error> {
     let toggled_power_state = bluez.toggle_power_state().map_err(Error::PowerState)?;
 
