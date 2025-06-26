@@ -323,7 +323,7 @@ impl BluezTestClient {
 
         match &self.erred_method_name {
             Some(v) if v == &err_key => Err(self.err.clone()),
-            _ => Ok(BluezPowerState::On),
+            _ => Ok(BluezPowerState::Off),
         }
     }
 
