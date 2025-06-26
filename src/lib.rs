@@ -8,10 +8,10 @@ mod scan;
 mod status;
 mod toggle;
 
-pub use bluez::Client as BluezClient;
+pub use bluez::{Client as BluezClient, Error as BluezError};
 pub use connect::connect;
 pub use disconnect::disconnect;
 pub use list_devices::list_devices;
 pub use scan::scan;
-pub use status::status;
+pub use status::{Error as StatusError, status};
 pub use toggle::toggle;
