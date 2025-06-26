@@ -1,3 +1,5 @@
+#![allow(dead_code, reason = "cfg test/not(test) for BluezDBusClient")]
+
 use std::{error, fmt};
 
 use zbus::{
