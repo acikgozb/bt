@@ -8,11 +8,36 @@ use crate::{
     format::{PrettyFormatter, TableFormattable, TerseFormatter},
 };
 
+/// Defines error variants that may be returned from a [`scan`] call.
+///
+/// [`scan`]: crate::scan
 #[derive(Debug)]
 pub enum Error {
+    /// Happens when [`BluezClient`] fails to start the scan.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
+    /// [`BluezClient`]: crate::BluezClient
     Start(bluez::Error),
+
+    /// Happens when [`BluezClient`] fails to stop the scan.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
+    /// [`BluezClient`]: crate::BluezClient
     Stop(bluez::Error),
+
+    /// Happens when the scanned devices could not be read.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
     DiscoveredDevices(bluez::Error),
+
+    /// Happens when the result of [`scan`] could not be written to the given buffer.
+    /// It holds the underlying [`io::Error`].
+    ///
+    /// [`scan`]: crate::scan
+    /// [`io::Error`]: std::io::Error
     Io(io::Error),
 }
 
@@ -37,6 +62,7 @@ impl From<io::Error> for Error {
     }
 }
 
+/// Defines the arguments that [`scan`] can take.
 #[derive(Debug, Args)]
 pub struct ScanArgs {
     /// Set the duration of the scan.
@@ -56,10 +82,30 @@ pub struct ScanArgs {
     pub values: Option<Vec<ScanColumn>>,
 }
 
+/// Defines the columns that are used to filter the pretty/terse output of [`scan`].
+///
+/// [`scan`]: crate::scan
 #[derive(Debug, Copy, Clone, clap::ValueEnum)]
 pub enum ScanColumn {
+    /// Alias shows the alias of the scanned Bluetooth device.
+    ///
+    /// The actual value of an alias depends on [`BluezClient`].
+    ///
+    /// [`BluezClient`]: crate::BluezClient
     Alias,
+
+    /// Address shows the MAC address of the scanned Bluetooth device.
+    ///
+    /// The actual value of a MAC address depends on [`BluezClient`].
+    ///
+    /// [`BluezClient`]: crate::BluezClient
     Address,
+
+    /// Rssi shows the signal strength of the scanned Bluetooth device.
+    ///
+    /// The actual value of an Rssi depends on [`BluezClient`].
+    ///
+    /// [`BluezClient`]: crate::BluezClient
     Rssi,
 }
 
@@ -93,6 +139,129 @@ impl From<&ScanColumn> for String {
     }
 }
 
+/// Provides the ability of scanning available devices by using a [`BluezClient`].
+///
+/// The list of scanned devices are written to the provided [`io::Write`].
+///
+/// The format of the scanned devices depend on the arguments passed:
+///
+/// - If `args.columns` are [`Some`], then [`scan`] uses the pretty formatting, which is a table.
+/// - If `args.values` are [`Some`], then [`scan`] uses the terse formatting, which is a listing where each property of the scanned devices are concatenated by the delimiter `/`.
+/// - If both `args.columns` and `args.values` are [`Some`], then [`scan`] uses the pretty formatting.
+/// - If both `args.columns` and `args.values` are [`None`], then [`scan`] uses the pretty formatting with the default columns `ALIAS, ADDRESS, RSSI`.
+///
+/// Here is how pretty formatting looks like:
+///
+/// ```txt
+/// ALIAS   ADDRESS             RSSI
+/// Dev1    XX:XX:XX:XX:XX:XX   -68
+/// Dev2    XX:XX:XX:XX:XX:XX   -94
+/// Dev3    XX:XX:XX:XX:XX:XX   -93
+/// ```
+///
+/// Here is how terse formatting looks like:
+///
+/// ```txt
+/// Dev1/XX:XX:XX:XX:XX:XX/-92
+/// Dev2/XX:XX:XX:XX:XX:XX/-97
+/// Dev3/XX:XX:XX:XX:XX:XX/-94
+/// ```
+///
+/// The scan duration can be adjusted by providing `args.duration` of [`ScanArgs`].
+/// Setting `args.duration` to 0 is not recommended since a certain amount of time needs to be passed to discover available devices.
+///
+/// [`scan`] is a blocking call. It blocks the current thread by `args.duration` seconds.
+///
+/// # Panics
+///
+/// This function does not panic.
+///
+/// # Errors
+///
+/// This function can return all variants of [`ScanError`] based on given conditions. For more details, please see the error documentation.
+///
+/// [`BluezClient`]: crate::BluezClient
+/// [`io::Write`]: std::io::Write
+/// [`Some`]: std::option::Option::Some
+/// [`ScanError`]: crate::ScanError
+/// [`scan`]: crate::scan
+/// [`ScanArgs`]: crate::ScanArgs
+///
+/// # Examples
+///
+/// Here is a basic [`scan`] call that will use pretty formatting.
+///
+/// ```no_run
+/// use std::io::Cursor;
+/// use bt::{scan, BluezClient, ScanArgs};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new(vec![]);
+///
+/// let args = ScanArgs {
+///     duration: 5,
+///     columns: None,
+///     values: None,
+/// };
+///
+/// let scan_result = scan(&bluez_client, &mut output, &args);
+/// match scan_result {
+///     Ok(_) => {
+///          let pretty_out = String::from_utf8(output.into_inner()).unwrap();
+///          println!("{}", pretty_out);
+///     },
+///     Err(e) => eprintln!("scan error: {}", e)
+/// }
+///```
+///
+/// Here is an example to showcase how to filter the scan output. The same filtering can be used for terse formatting by using `args.values` instead.
+///
+///```no_run
+/// use std::io::Cursor;
+/// use bt::{scan, BluezClient, ScanArgs, ScanColumn};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new(vec![]);
+///
+/// # The address column is stripped out from the output.
+/// let args = ScanArgs {
+///     duration: 5,
+///     columns: Some(vec![ScanColumn::Alias, ScanColumn::Rssi]),
+///     values: None,
+/// };
+///
+/// let scan_result = scan(&bluez_client, &mut output, &args);
+/// match scan_result {
+///     Ok(_) => {
+///          let pretty_out = String::from_utf8(output.into_inner()).unwrap();
+///          println!("{}", pretty_out);
+///     },
+///     Err(e) => eprintln!("scan error: {}", e)
+/// }
+/// ```
+///
+/// Here is an error case. The example triggers an [`io::Error`] by passing an array as a buffer, instead of a growable buffer.
+///
+/// ```no_run
+/// use std::io::Cursor;
+/// use bt::{scan, BluezClient, ScanArgs, ScanError};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new([]);
+///
+/// let args = ScanArgs {
+///     duration: 5,
+///     columns: None,
+///     values: None,
+/// };
+///
+/// let scan_result = scan(&bluez_client, &mut output, &args);
+///
+/// match scan_result {
+///     Err(ScanError::Io(err)) => eprintln!("{}", err),
+///     _ => unreachable!(),
+/// }
+///```
 pub fn scan(
     bluez: &crate::BluezClient,
     f: &mut impl io::Write,
