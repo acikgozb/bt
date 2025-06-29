@@ -4,7 +4,7 @@ use std::{error, io, thread, time::Duration};
 use clap::Args;
 
 use crate::{
-    bluez,
+    BluezError, bluez,
     format::{PrettyFormatter, TableFormattable, TerseFormatter},
 };
 
@@ -13,25 +13,12 @@ use crate::{
 /// [`scan`]: crate::scan
 #[derive(Debug)]
 pub enum Error {
-    /// Happens when [`BluezClient`] fails to start the scan.
-    /// It holds the underlying [`bluez::Error`] error.
+    /// Happens when the [`BluezClient`] fails during a [`scan`] call.
+    /// It holds the underlying [`BluezError`].
     ///
-    /// [`bluez::Error`]: crate::bluez::Error
+    /// [`BluezError`]: crate::BluezError
     /// [`BluezClient`]: crate::BluezClient
-    Start(bluez::Error),
-
-    /// Happens when [`BluezClient`] fails to stop the scan.
-    /// It holds the underlying [`bluez::Error`] error.
-    ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    /// [`BluezClient`]: crate::BluezClient
-    Stop(bluez::Error),
-
-    /// Happens when the scanned devices could not be read.
-    /// It holds the underlying [`bluez::Error`] error.
-    ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    DiscoveredDevices(bluez::Error),
+    Bluez(BluezError),
 
     /// Happens when the result of [`scan`] could not be written to the given buffer.
     /// It holds the underlying [`io::Error`].
@@ -44,17 +31,19 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Start(error) => write!(f, "unable to start device discovery: {}", error),
-            Error::Stop(error) => write!(f, "unable to stop device discovery: {}", error),
-            Error::DiscoveredDevices(error) => {
-                write!(f, "unable to get discovered devices: {}", error)
-            }
-            Error::Io(error) => write!(f, "io error: {}", error),
+            Error::Bluez(error) => write!(f, "scan: bluez error: {}", error),
+            Error::Io(error) => write!(f, "scan: io error: {}", error),
         }
     }
 }
 
 impl error::Error for Error {}
+
+impl From<BluezError> for Error {
+    fn from(value: BluezError) -> Self {
+        Self::Bluez(value)
+    }
+}
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
@@ -290,10 +279,10 @@ pub fn scan(
         ),
     };
 
-    bluez.start_discovery().map_err(Error::Start)?;
+    bluez.start_discovery()?;
     thread::sleep(Duration::from_secs(u64::from(args.duration)));
 
-    let scanned_devices = bluez.scanned_devices().map_err(Error::DiscoveredDevices)?;
+    let scanned_devices = bluez.scanned_devices()?;
 
     let devices_iter = scanned_devices.into_iter();
     let out_buf = match out_format {
@@ -303,7 +292,7 @@ pub fn scan(
 
     f.write_all(out_buf.as_bytes())?;
 
-    bluez.stop_discovery().map_err(Error::Stop)?;
+    bluez.stop_discovery()?;
 
     Ok(())
 }
