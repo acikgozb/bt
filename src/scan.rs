@@ -63,6 +63,8 @@ impl From<io::Error> for Error {
 }
 
 /// Defines the arguments that [`scan`] can take.
+///
+/// [`scan`]: crate::scan
 #[derive(Debug, Args)]
 pub struct ScanArgs {
     /// Set the duration of the scan.
