@@ -175,7 +175,7 @@ $ bt sc --values
 # Dev4/XX:XX:XX:XX:XX:XX/-78
 ```
 
-Similar to `bt list-devices`, the output can be filtered by specifying the corresponding columns.
+Similar to `bt ls`, the output can be filtered by specifying the corresponding columns.
 
 ```bash
 $ bt sc --values alias,rssi
