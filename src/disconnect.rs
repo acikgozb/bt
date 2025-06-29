@@ -179,7 +179,7 @@ impl TableFormattable<DisconnectColumn> for (&usize, &bluez::BluezDevice) {
 ///
 /// // Before returning `disconnect_result`, [`disconnect`] writes the list of connected devices to `output`.
 /// // The selection will be read from `input`.
-/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input.lock(), &force, &aliases);
 /// match disconnect_result {
 ///     Ok(_) => {
 ///          // `output` contains the success message.
@@ -204,7 +204,7 @@ impl TableFormattable<DisconnectColumn> for (&usize, &bluez::BluezDevice) {
 ///
 /// // Before returning `disconnect_result`, [`disconnect`] writes the list of connected devices to `output`.
 /// // The selection will be read from `input`.
-/// let disconnect_result = connect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input.lock(), &force, &aliases);
 /// match disconnect_result {
 ///     Ok(_) => {
 ///          // `output` contains the success message.
@@ -230,7 +230,7 @@ impl TableFormattable<DisconnectColumn> for (&usize, &bluez::BluezDevice) {
 /// // `disconnect` tries to disconnect from the device that has the alias "connected_dev".
 /// // It will not show the connected devices.
 /// // `output` is only used to provide the success message.
-/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input.lock(), &force, &aliases);
 /// match disconnect_result {
 ///     Ok(_) => {
 ///          // `output` contains the success message.
@@ -256,7 +256,7 @@ impl TableFormattable<DisconnectColumn> for (&usize, &bluez::BluezDevice) {
 /// // `disconnect` tries to remove the device that has the alias "connected_dev".
 /// // It will not show the connected devices.
 /// // `output` is only used to provide the success message.
-/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input.lock(), &force, &aliases);
 /// match disconnect_result {
 ///     Ok(_) => {
 ///          // `output` contains the success message.
