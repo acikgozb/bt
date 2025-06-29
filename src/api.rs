@@ -1,7 +1,10 @@
+//! Defines the members which allow the callers to implement a CLI application through this crate.
+
 use clap::{Parser, Subcommand, arg, command};
 
 use crate::{connect::ConnectArgs, list_devices::ListDevicesArgs, scan::ScanArgs};
 
+/// The main CLI struct that holds all subcommands.
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
@@ -9,6 +12,23 @@ pub struct Cli {
     pub command: Option<BtCommand>,
 }
 
+/// Defines each individual functionality of this crate as a subcommand of a CLI application.
+///
+/// For more details, please refer to each module that corresponds to each subcommand:
+///
+/// - `BtCommand::Status`: [`status`]
+/// - `BtCommand::Toggle`: [`toggle`]
+/// - `BtCommand::list_devices`: [`list_devices`]
+/// - `BtCommand::scan`: [`scan`]
+/// - `BtCommand::connect`: [`connect`]
+/// - `BtCommand::disconnect`: [`disconnect`]
+///
+/// [`status`]: crate::status
+/// [`toggle`]: crate::toggle
+/// [`list_devices`]: crate::list_devices
+/// [`scan`]: crate::scan
+/// [`connect`]: crate::connect
+/// [`disconnect`]: crate::disconnect
 #[derive(Debug, Subcommand)]
 pub enum BtCommand {
     /// See Bluetooth status.
