@@ -244,7 +244,7 @@ enum ListDevicesOutput {
 ///
 ///```no_run
 /// use std::io::Cursor;
-/// use bt::{list_devices, BluezClient, ListDevicesArgs, ListDevicesColumn};
+/// use bt::{list_devices, BluezClient, ListDevicesArgs, ListDevicesColumn, DeviceStatus};
 ///
 /// let bluez_client = BluezClient::new().unwrap();
 /// let mut output = Cursor::new(vec![]);

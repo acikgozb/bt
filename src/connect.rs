@@ -208,7 +208,7 @@ const DEFAULT_LISTING_COLUMNS: [ConnectColumn; 4] = [
 ///
 /// // Before returning `connect_result`, [`connect`] writes the list of scanned devices to `output`.
 /// // The selection will be read from `input`.
-/// let connect_result = connect(&bluez_client, &mut output, &mut input, &args);
+/// let connect_result = connect(&bluez_client, &mut output, &mut input.lock(), &args);
 /// match connect_result {
 ///     Ok(_) => {
 ///          // `output` contains the success message.
@@ -236,7 +236,7 @@ const DEFAULT_LISTING_COLUMNS: [ConnectColumn; 4] = [
 ///
 /// // Before returning `connect_result`, [`connect`] writes the list of scanned devices to `output`.
 /// // The selection will be read from `input`.
-/// let connect_result = connect(&bluez_client, &mut output, &mut input, &args);
+/// let connect_result = connect(&bluez_client, &mut output, &mut input.lock(), &args);
 /// match connect_result {
 ///     Ok(_) => {
 ///          // `output` contains the success message.
@@ -265,7 +265,7 @@ const DEFAULT_LISTING_COLUMNS: [ConnectColumn; 4] = [
 /// // `connect` tries to connect to a device that has the alias "known_dev".
 /// // There is no scanning here.
 /// // `output` is only used to provide the success message.
-/// let connect_result = connect(&bluez_client, &mut output, &mut input, &args);
+/// let connect_result = connect(&bluez_client, &mut output, &mut input.lock(), &args);
 /// match connect_result {
 ///     Ok(_) => {
 ///          // `output` contains the success message.

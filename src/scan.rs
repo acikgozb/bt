@@ -207,7 +207,7 @@ impl From<&ScanColumn> for String {
 /// let bluez_client = BluezClient::new().unwrap();
 /// let mut output = Cursor::new(vec![]);
 ///
-/// # The address column is stripped out from the output.
+/// // The address column is stripped out from the output.
 /// let args = ScanArgs {
 ///     duration: 5,
 ///     columns: Some(vec![ScanColumn::Alias, ScanColumn::Rssi]),
