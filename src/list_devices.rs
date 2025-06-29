@@ -8,9 +8,23 @@ use crate::{
     format::{PrettyFormatter, TableFormattable, TerseFormatter},
 };
 
+/// Defines error variants that may be returned from a [`list_devices`] call.
+///
+/// [`list_devices`]: crate::list_devices
 #[derive(Debug)]
 pub enum Error {
+    /// Happens when the known devices cannot be read.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
     KnownDevices(bluez::Error),
+
+    /// Happens when [`list_devices`] cannot write to the provided [`io::Write`].
+    ///
+    /// It holds the underlying [`io::Error`].
+    ///
+    /// [`list_devices`]: crate::list_devices
+    /// [`io::Error`]: std::io::Error
     Io(io::Error),
 }
 
@@ -33,21 +47,25 @@ impl From<io::Error> for Error {
     }
 }
 
+/// Defines the arguments that [`list_devices`] can take.
+///
+/// [`list_devices`]: crate::list_devices
 #[derive(Debug, Args)]
 pub struct ListDevicesArgs {
     /// Filter the table output based on given keys.
     #[arg(short, long, value_delimiter = ',')]
-    columns: Option<Vec<ListDevicesColumn>>,
+    pub columns: Option<Vec<ListDevicesColumn>>,
 
     /// Filter the terse output based on given keys.
     #[arg(short, long, value_delimiter = ',')]
-    values: Option<Vec<ListDevicesColumn>>,
+    pub values: Option<Vec<ListDevicesColumn>>,
 
     /// Filter output based on device status.
     #[arg(short, long)]
-    status: Option<DeviceStatus>,
+    pub status: Option<DeviceStatus>,
 }
 
+/// Defines the columns of a [`list_devices`] output.
 #[derive(Debug, Copy, Clone, clap::ValueEnum)]
 pub enum ListDevicesColumn {
     Alias,
@@ -58,6 +76,7 @@ pub enum ListDevicesColumn {
     Paired,
 }
 
+/// Defines the available statuses of Bluetooth devices.
 #[derive(Debug, Copy, Clone, clap::ValueEnum)]
 pub enum DeviceStatus {
     Connected,
@@ -122,6 +141,154 @@ enum ListDevicesOutput {
     Terse,
 }
 
+/// Provides a list of known Bluetooth devices on the host by using a [`BluezClient`].
+///
+/// The list is written to the provided [`io::Write`].
+///
+/// The format of the list depends on the arguments passed:
+///
+/// - If `args.columns` are [`Some`], then [`list_devices`] uses the pretty formatting, which is a table.
+/// - If `args.values` are [`Some`], then [`list_devices`] uses the terse formatting, which is a listing where each property of the scanned devices are concatenated by the delimiter `/`.
+/// - If both `args.columns` and `args.values` are [`Some`], then [`list_devices`] uses the pretty formatting.
+/// - If both `args.columns` and `args.values` are [`None`], then [`list_devices`] uses the pretty formatting with the default columns `ALIAS, ADDRESS, CONNECTED, TRUSTED, BONDED, PAIRED`.
+///
+/// Here is how pretty formatting looks like:
+///
+/// ```txt
+/// ALIAS         ADDRESS             CONNECTED   TRUSTED   BONDED   PAIRED
+/// KnownDev1     XX:XX:XX:XX:XX:XX   true        true      false    true
+/// KnownDev2     XX:XX:XX:XX:XX:XX   false       true      false    false
+/// ```
+///
+/// Here is how terse formatting looks like:
+///
+/// ```txt
+/// KnownDev1/XX:XX:XX:XX:XX:XX/true/true/false/true
+/// KnownDev2/XX:XX:XX:XX:XX:XX/false/true/false/false
+/// ```
+///
+/// The columns can be filtered by the provided [`ListDevicesColumn`] in `args.columns` or `args.values`.
+///
+/// The devices can be filtered by the provided [`DeviceStatus`] in `args.status`.
+///
+/// # Panics
+///
+/// This function does not panic.
+///
+/// # Errors
+///
+/// This function can return all variants of [`ListDevicesError`] based on given conditions. For more details, please see the error documentation.
+///
+///
+/// # Examples
+///
+/// Here is a basic [`list_devices`] call that will use pretty formatting with no column or status filtering.
+///
+/// ```no_run
+/// use std::io::Cursor;
+/// use bt::{list_devices, BluezClient, ListDevicesArgs};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new(vec![]);
+///
+/// let args = ListDevicesArgs {
+///     columns: None,
+///     values: None,
+///     status: None,
+/// };
+///
+/// let list_dev_result = list_devices(&bluez_client, &mut output, &args);
+/// match list_dev_result {
+///     Ok(_) => {
+///          let pretty_out = String::from_utf8(output.into_inner()).unwrap();
+///          println!("{}", pretty_out);
+///     },
+///     Err(e) => eprintln!("list_devices error: {}", e)
+/// }
+///```
+///
+/// Here is an example to showcase how to filter the list. The same filtering can be used for terse formatting by using `args.values` instead.
+///
+///```no_run
+/// use std::io::Cursor;
+/// use bt::{list_devices, BluezClient, ListDevicesArgs, ListDevicesColumn};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new(vec![]);
+///
+/// // Only ALIAS, CONNECTED, and TRUSTED columns are shown.
+/// let args = ListDevicesArgs {
+///     columns: Some(vec![ListDevicesColumn::Alias, ListDevicesColumn::Connected, ListDevicesColumn::Trusted]),
+///     values: None,
+///     status: None,
+/// };
+///
+/// let list_dev_result = list_devices(&bluez_client, &mut output, &args);
+/// match list_dev_result {
+///     Ok(_) => {
+///          let pretty_out = String::from_utf8(output.into_inner()).unwrap();
+///          println!("{}", pretty_out);
+///     },
+///     Err(e) => eprintln!("list_devices error: {}", e)
+/// }
+/// ```
+///
+/// Here is an example to showcase how to filter the list by device status'. The same filtering can be used for terse formatting by using `args.values` instead.
+///
+///```no_run
+/// use std::io::Cursor;
+/// use bt::{list_devices, BluezClient, ListDevicesArgs, ListDevicesColumn};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new(vec![]);
+///
+/// // Only the ALIAS of connected devices are shown.
+/// let args = ListDevicesArgs {
+///     columns: Some(vec![ListDevicesColumn::Alias]),
+///     values: None,
+///     status: Some(DeviceStatus::Connected),
+/// };
+///
+/// let list_dev_result = list_devices(&bluez_client, &mut output, &args);
+/// match list_dev_result {
+///     Ok(_) => {
+///          let pretty_out = String::from_utf8(output.into_inner()).unwrap();
+///          println!("{}", pretty_out);
+///     },
+///     Err(e) => eprintln!("list_devices error: {}", e)
+/// }
+/// ```
+///
+/// Here is an error case. The example triggers an [`io::Error`] by passing an array as a buffer, instead of a growable buffer.
+///
+/// ```no_run
+/// use std::io::Cursor;
+/// use bt::{list_devices, BluezClient, ListDevicesArgs, ListDevicesError};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut output = Cursor::new([]);
+///
+/// let args = ListDevicesArgs {
+///     columns: None,
+///     values: None,
+///     status: None,
+/// };
+///
+/// let list_dev_result = list_devices(&bluez_client, &mut output, &args);
+/// match list_dev_result {
+///     Err(ListDevicesError::Io(err)) => eprintln!("{}", err),
+///     _ => unreachable!(),
+/// }
+///```
+///
+/// [`BluezClient`]: crate::BluezClient
+/// [`io::Write`]: std::io::Write
+/// [`Some`]: std::option::Option::Some
+/// [`None`]: std::option::Option::None
+/// [`ListDevicesError`]: crate::ListDevicesError
+/// [`list_devices`]: crate::list_devices
+/// [`ListDevicesArgs`]: crate::ListDevicesArgs
+/// [`DeviceStatus`]: crate::DeviceStatus
 pub fn list_devices(
     bluez: &crate::BluezClient,
     f: &mut impl io::Write,

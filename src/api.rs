@@ -20,19 +20,20 @@ pub enum BtCommand {
     Toggle,
 
     #[clap(visible_alias = "ls")]
+    /// See known Bluetooth devices on the host.
     ListDevices {
         #[command(flatten)]
         args: ListDevicesArgs,
     },
 
-    /// Scan available devices.
+    /// Scan available Bluetooth devices.
     #[clap(visible_alias = "sc")]
     Scan {
         #[command(flatten)]
         args: ScanArgs,
     },
 
-    /// Connect to an available device.
+    /// Connect to an available Bluetooth device.
     #[clap(visible_alias = "c")]
     Connect {
         #[command(flatten)]
