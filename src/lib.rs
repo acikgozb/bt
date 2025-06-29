@@ -8,7 +8,7 @@ mod scan;
 mod status;
 mod toggle;
 
-pub use bluez::{Client as BluezClient, Error as BluezError};
+pub use bluez::{BluezDevice, Client as BluezClient, Error as BluezError};
 pub use connect::{ConnectArgs, Error as ConnectError, connect};
 pub use disconnect::{Error as DisconnectError, disconnect};
 pub use list_devices::{

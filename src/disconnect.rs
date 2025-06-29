@@ -96,7 +96,7 @@ impl From<&DisconnectColumn> for String {
     }
 }
 
-impl TableFormattable<DisconnectColumn> for (&usize, &bluez::Device) {
+impl TableFormattable<DisconnectColumn> for (&usize, &bluez::BluezDevice) {
     fn get_cell_value_by_column(&self, column: &DisconnectColumn) -> String {
         match column {
             DisconnectColumn::Idx => self.0.to_string(),
@@ -331,7 +331,7 @@ pub fn disconnect(
 fn get_aliases_from_user(
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
-    devices: Vec<bluez::Device>,
+    devices: Vec<bluez::BluezDevice>,
 ) -> Result<Vec<String>, Error> {
     let dev_len = devices.len();
     if dev_len == 0 {

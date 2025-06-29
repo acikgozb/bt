@@ -117,7 +117,7 @@ impl From<&ConnectColumn> for String {
     }
 }
 
-impl TableFormattable<ConnectColumn> for (&usize, &bluez::Device) {
+impl TableFormattable<ConnectColumn> for (&usize, &bluez::BluezDevice) {
     fn get_cell_value_by_column(&self, column: &ConnectColumn) -> String {
         match column {
             ConnectColumn::Idx => format!("({})", self.0),
@@ -341,7 +341,7 @@ fn scan_devices(
     bluez: &crate::BluezClient,
     duration: &Option<u8>,
     contains_name: &Option<String>,
-) -> Result<Vec<bluez::Device>, Error> {
+) -> Result<Vec<bluez::BluezDevice>, Error> {
     bluez.start_discovery()?;
 
     let scan_duration = u64::from(duration.unwrap_or(5));
@@ -360,9 +360,9 @@ fn scan_devices(
 fn read_device_alias(
     w: &mut impl io::Write,
     r: &mut impl io::BufRead,
-    devices: Vec<bluez::Device>,
+    devices: Vec<bluez::BluezDevice>,
 ) -> Result<String, Error> {
-    let mut device_map: BTreeMap<usize, bluez::Device> =
+    let mut device_map: BTreeMap<usize, bluez::BluezDevice> =
         BTreeMap::from_iter(devices.into_iter().enumerate());
 
     let devices = device_map

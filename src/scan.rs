@@ -108,7 +108,7 @@ enum ScanOutput {
     Terse,
 }
 
-impl TableFormattable<ScanColumn> for bluez::Device {
+impl TableFormattable<ScanColumn> for bluez::BluezDevice {
     fn get_cell_value_by_column(&self, column: &ScanColumn) -> String {
         match column {
             ScanColumn::Alias => self.alias().to_string(),
