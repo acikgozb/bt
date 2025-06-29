@@ -143,9 +143,9 @@ impl From<&ScanColumn> for String {
 
 /// Provides the ability of scanning available devices by using a [`BluezClient`].
 ///
-/// The list of scanned devices are written to the provided [`io::Write`].
+/// The list is written to the provided [`io::Write`].
 ///
-/// The format of the scanned devices depend on the arguments passed:
+/// The format of the list depends on the arguments passed:
 ///
 /// - If `args.columns` are [`Some`], then [`scan`] uses the pretty formatting, which is a table.
 /// - If `args.values` are [`Some`], then [`scan`] uses the terse formatting, which is a listing where each property of the scanned devices are concatenated by the delimiter `/`.
@@ -181,13 +181,6 @@ impl From<&ScanColumn> for String {
 /// # Errors
 ///
 /// This function can return all variants of [`ScanError`] based on given conditions. For more details, please see the error documentation.
-///
-/// [`BluezClient`]: crate::BluezClient
-/// [`io::Write`]: std::io::Write
-/// [`Some`]: std::option::Option::Some
-/// [`ScanError`]: crate::ScanError
-/// [`scan`]: crate::scan
-/// [`ScanArgs`]: crate::ScanArgs
 ///
 /// # Examples
 ///
@@ -264,6 +257,14 @@ impl From<&ScanColumn> for String {
 ///     _ => unreachable!(),
 /// }
 ///```
+///
+/// [`BluezClient`]: crate::BluezClient
+/// [`io::Write`]: std::io::Write
+/// [`Some`]: std::option::Option::Some
+/// [`None`]: std::option::Option::None
+/// [`ScanError`]: crate::ScanError
+/// [`scan`]: crate::scan
+/// [`ScanArgs`]: crate::ScanArgs
 pub fn scan(
     bluez: &crate::BluezClient,
     f: &mut impl io::Write,
