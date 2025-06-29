@@ -1,9 +1,17 @@
 [package]
 name = "bt"
 version = "0.1.0"
+authors = ["Berk Acikgoz <acikgozb@proton.me>"]
 edition = "2024"
+description = "A CLI for managing bluetooth devices through Bluez D-Bus."
+repository = "https://github.com/acikgozb/bt"
 
 [dependencies]
 clap = { version = "4.5.39", features = ["derive"] }
 tabled = { version = "0.19.0", features = ["std", "ansi"] }
 zbus = { version = "5.7.1", default-features = false, features = ["tokio", "blocking-api"] }
+
+[profile.release]
+lto = true
+strip = true
+codegen-units = 1
