@@ -46,7 +46,8 @@ pub enum Error {
     /// - User enters something other than the provided indexes.
     InvalidAlias,
 
-    /// Happens when the result of [`connect`] could not be written to the given buffer.
+    /// Happens when [`connect`] cannot write to the provided [`io::Write`] or cannot read from the provided [`io::BufRead`].
+    ///
     /// It holds the underlying [`io::Error`].
     ///
     /// [`connect`]: crate::connect
@@ -321,7 +322,8 @@ const DEFAULT_LISTING_COLUMNS: [ConnectColumn; 4] = [
 /// [`io::Write`]: std::io::Write
 /// [`io::BufRead`]: std::io::BufRead
 /// [`Some`]: std::option::Option::Some
-/// [`ConnectError`]: crate::ScanError
+/// [`None`]: std::option::Option::None
+/// [`ConnectError`]: crate::ConnectError
 /// [`ConnectArgs`]: crate::ConnectArgs
 /// [`connect`]: crate::connect
 /// [`scan`]: crate::scan
