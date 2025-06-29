@@ -1,0 +1,85 @@
+name: "bt - Release"
+run-name: "bt - Release on ${{ github.ref }}"
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GIT_TAG: ${{ github.ref_name }}
+
+jobs:
+  integrity_checks:
+    uses: ./.github/workflows/ci.yml
+
+  create_release:
+    runs-on: ubuntu-24.04
+    needs: integrity_checks
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create release
+        run: |
+          gh release create "$GIT_TAG" --verify-tag --draft --title "$GIT_TAG"
+
+        shell: bash
+
+
+  archive:        
+    runs-on: ubuntu-24.04
+    needs: create_release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create release binary
+        env:
+          RUST_TARGET: "x86_64-unknown-linux-gnu"
+        run: |
+          ./exec build "$RUST_TARGET"
+          
+        shell: bash
+
+      - name: Archive release binary
+        id: create-archive
+        env:
+          RUST_TARGET: "x86_64-unknown-linux-gnu"
+        run: |
+          name="bt-$RUST_TARGET-$GIT_TAG.tar.gz"
+          path="./target/$RUST_TARGET/release/$name"
+
+          ./exec create_archive "$RUST_TARGET" "$path"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Create checksum
+        id: create-checksum
+        env:
+          RUST_TARGET: "x86_64-unknown-linux-gnu"
+        run: |
+          name="bt-$RUST_TARGET-$GIT_TAG.sha256sum"
+          path="./target/$RUST_TARGET/release/$name"
+
+          ./exec create_checksum "$RUST_TARGET" "$path"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifacts to the release
+        env:
+          ARCHIVE_PATH: ${{ steps.create-archive.outputs.path }}
+          CHECKSUM_PATH: ${{ steps.create-checksum.outputs.path }}
+        run: |
+          gh release upload "$GIT_TAG" \
+            "$ARCHIVE_PATH" \
+            "$CHECKSUM_PATH"
+          
+        shell: bash
+
+      - name: Rollback release on failure
+        if: failure()
+        run: |
+          gh release delete "$GIT_TAG" -y --cleanup-tag        
