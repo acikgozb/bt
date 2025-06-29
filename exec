@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+PROGRAM="bt-ci-exec"
+
+function check_extern_commands {
+  for cmd in "${@}"; do
+    if ! which "$cmd" > /dev/null 2>&1; then
+      echo "$PROGRAM: install $cmd to proceed" >&2
+      exit 1
+    fi
+  done
+}
+
+function test {
+  check_extern_commands "cargo"
+  cargo test
+}
+
+function lint {
+  check_extern_commands "cargo"
+  cargo clippy --no-deps
+}
+
+function build {
+  check_extern_commands "cargo"
+
+  RUST_TARGET="${1:-x86_64-unknown-linux-gnu}"
+  cargo build --release --locked --target "$RUST_TARGET"
+}
+
+function create_archive {
+  check_extern_commands "tar"
+
+  RUST_TARGET="${1:-x86_64-unknown-linux-gnu}"
+  ARCHIVE_PATH="${2:-binary.tar.gz}"
+
+  tar -C "./target/$RUST_TARGET/release" -czvf "$ARCHIVE_PATH" "bt"
+}
+
+function create_checksum {
+  check_extern_commands "sha256sum"
+
+  RUST_TARGET="${1:-x86_64-unknown-linux-gnu}"
+  CHECKSUM_PATH="${2:-binary.sha256sum}"
+
+  sha256sum "./target/$RUST_TARGET/release/bt" > "$CHECKSUM_PATH"
+}
+
+"$@"
