@@ -7,13 +7,50 @@ use crate::{
     format::{PrettyFormatter, TableFormattable},
 };
 
+/// Defines error variants that may be returned from a [`connect`] call.
+///
+/// [`connect`]: crate::connect
 #[derive(Debug)]
 pub enum Error {
+    /// Happens when [`BluezClient`] fails to start the scan. This variant may only occur during the interactive mode.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
+    /// [`BluezClient`]: crate::BluezClient
     StartDiscovery(bluez::Error),
+
+    /// Happens when the scanned devices could not be read. This variant may only occur during the interactive mode.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
     DiscoveredDevices(bluez::Error),
+
+    /// Happens when [`BluezClient`] fails to stop the scan. This variant may only occur during the interactive mode.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
+    /// [`BluezClient`]: crate::BluezClient
     StopDiscovery(bluez::Error),
+
+    /// Happens when the connection attempt fails.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
     Connect(bluez::Error),
+
+    /// Happens when the user selects an invalid alias. This variant may only occur during the interactive mode.
+    ///
+    /// The selection is invalid when:
+    ///
+    /// - User enters an index which does not exist on the list.
+    /// - User enters something other than the provided indexes.
     InvalidAlias,
+
+    /// Happens when the result of [`connect`] could not be written to the given buffer.
+    /// It holds the underlying [`io::Error`].
+    ///
+    /// [`connect`]: crate::connect
+    /// [`io::Error`]: std::io::Error
     Io(io::Error),
 }
 
@@ -52,6 +89,9 @@ impl From<ParseIntError> for Error {
     }
 }
 
+/// Defines the arguments that [`connect`] can take.
+///
+/// [`connect`]: crate::connect
 #[derive(Debug, Args)]
 pub struct ConnectArgs {
     /// Set the duration of the interactive scan.
@@ -118,6 +158,174 @@ const DEFAULT_LISTING_COLUMNS: [ConnectColumn; 4] = [
     ConnectColumn::Rssi,
 ];
 
+/// Provides the ability of establishing a connection to an available device by using a [`BluezClient`].
+///
+/// [`connect`] has **interactive** and **non-interactive** modes and they are based on the provided [`ConnectArgs`].
+///
+/// # Interactive Mode
+///
+/// [`connect`] runs interactively if `args.alias` is [`None`].
+///
+/// In this mode, [`connect`] initiates a Bluetooth scan first to find out the available devices to connect.
+///
+/// The scanned devices can be filtered by their ALIAS by providing `args.contains_name`. This argument is expected to be a simple substring of the target ALIAS. It is NOT a regex pattern. Please see the examples for its usage.
+///
+/// The interactive scan is blocking, similar to [`scan`]. It blocks the current thread by 5 seconds and this duration can be adjusted by setting `args.duration`. Setting `args.duration` to 0 is not recommended since a certain amount of time needs to be passed to discover available devices.
+///
+/// When the scan is completed, the scanned devices are written to the provided [`io::Write`]. The written list is in pretty format (is a table) and has the same columns as what [`scan`] provides with the addition of IDX column. Unlike [`scan`], the columns or the formatting are not customizable.
+///
+/// The selected IDX of a scanned device is read from the provided [`io::BufRead`].
+///
+/// Here is how the table of scanned devices looks like:
+///
+/// ```txt
+/// IDX    ALIAS   ADDRESS             RSSI
+/// (0)    Dev1    XX:XX:XX:XX:XX:XX   -68
+/// (1)    Dev2    XX:XX:XX:XX:XX:XX   -94
+/// (2)    Dev3    XX:XX:XX:XX:XX:XX   -93
+/// ```
+///
+/// Once an IDX is selected, [`connect`] tries to establish a connection by using a [`BluezClient`].
+/// Upon establishing a connection, [`connect`] writes a message to the provided [`io::Write`].
+///
+/// # Non-Interactive Mode
+///
+/// [`connect`] runs non-interactively if `args.alias` is [`Some`].
+///
+/// In this mode, [`connect`] does NOT initiate a scan and tries to establish a connection to the device by the provided `args.alias`.
+///
+/// Upon establishing a connection, [`connect`] writes a messages to the provided [`io::Write`].
+///
+/// This mode should be preferred to the interactive mode if the device is known by the host.
+///
+/// In order to see whether the device is known or not, [`list_devices`] can be used.
+///
+/// # Panics
+///
+/// This function does not panic.
+///
+/// # Errors
+///
+/// This function can return all variants of [`ConnectError`] based on given conditions. For more details, please see the error documentation.
+///
+/// # Examples
+///
+/// Here is an example for an interactive [`connect`]. In this example, the interactive scan is not filtered and its duration is set to `5` seconds (default).
+///
+/// ```no_run
+/// use std::io;
+/// use bt::{connect, BluezClient, ConnectArgs};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = io::stdin();
+/// let mut output = io::stdout();
+///
+/// let args = ConnectArgs {
+///     duration: None,
+///     contains_name: None,
+///     alias: None,
+/// };
+///
+/// // Before returning `connect_result`, [`connect`] writes the list of scanned devices to `output`.
+/// // The selection will be read from `input`.
+/// let connect_result = connect(&bluez_client, &mut output, &mut input, &args);
+/// match connect_result {
+///     Ok(_) => {
+///          // `output` contains the success message.
+///          // ...
+///     },
+///     Err(e) => eprintln!("connect error: {}", e)
+/// }
+///```
+///
+/// Here is another example for an interactive [`connect`]. In this example, the interactive scan is filtered by `args.contains_name` to only see the available devices which contains the name "dev". The duration is set to [`None`] to use the default (`5` seconds).
+///
+///```no_run
+/// use std::io;
+/// use bt::{connect, BluezClient, ConnectArgs};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = io::stdin();
+/// let mut output = io::stdout();
+///
+/// let args = ConnectArgs {
+///     duration: None,
+///     contains_name: Some("dev".to_string()),
+///     alias: None,
+/// };
+///
+/// // Before returning `connect_result`, [`connect`] writes the list of scanned devices to `output`.
+/// // The selection will be read from `input`.
+/// let connect_result = connect(&bluez_client, &mut output, &mut input, &args);
+/// match connect_result {
+///     Ok(_) => {
+///          // `output` contains the success message.
+///          // ...
+///     },
+///     Err(e) => eprintln!("connect error: {}", e)
+/// }
+/// ```
+///
+/// Here is an example for a non-interactive [`connect`]. In this example, `args.alias` is set to the ALIAS of the known device that we want to connect directly.
+///
+///```no_run
+/// use std::io;
+/// use bt::{connect, BluezClient, ConnectArgs};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = io::stdin();
+/// let mut output = io::stdout();
+///
+/// let args = ConnectArgs {
+///     duration: None,
+///     contains_name: None,
+///     alias: Some("known_dev".to_string()),
+/// };
+///
+/// // `connect` tries to connect to a device that has the alias "known_dev".
+/// // There is no scanning here.
+/// // `output` is only used to provide the success message.
+/// let connect_result = connect(&bluez_client, &mut output, &mut input, &args);
+/// match connect_result {
+///     Ok(_) => {
+///          // `output` contains the success message.
+///          // ...
+///     },
+///     Err(e) => eprintln!("connect error: {}", e)
+/// }
+/// ```
+///
+/// Here is an error case. The example triggers an [`io::Error`] by passing an array as a buffer, instead of a growable buffer.
+///
+/// ```no_run
+/// use std::io::Cursor;
+/// use bt::{connect, BluezClient, ConnectArgs, ConnectError};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = Cursor::new([]);
+/// let mut output = Cursor::new([]);
+///
+/// let args = ConnectArgs {
+///     duration: None,
+///     contains_name: None,
+///     alias: Some("known_dev".to_string()),
+/// };
+///
+/// let connect_result = connect(&bluez_client, &mut output, &mut input, &args);
+/// match connect_result {
+///     Err(ConnectError::Io(err)) => eprintln!("{}", err),
+///     _ => unreachable!(),
+/// }
+///```
+/// [`BluezClient`]: crate::BluezClient
+/// [`io::Write`]: std::io::Write
+/// [`io::BufRead`]: std::io::BufRead
+/// [`Some`]: std::option::Option::Some
+/// [`ConnectError`]: crate::ScanError
+/// [`ConnectArgs`]: crate::ConnectArgs
+/// [`connect`]: crate::connect
+/// [`scan`]: crate::scan
+/// [`list_devices`]: crate::list_devices
 pub fn connect(
     bluez: &crate::BluezClient,
     w: &mut impl io::Write,
