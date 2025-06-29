@@ -5,13 +5,46 @@ use crate::{
     format::{PrettyFormatter, TableFormattable},
 };
 
+/// Defines error variants that may be returned from a [`disconnect`] call.
+///
+/// [`disconnect`]: crate::disconnect
 #[derive(Debug)]
 pub enum Error {
+    /// Happens when the disconnect attempt fails.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
     Disconnect(bluez::Error),
+
+    /// Happens when the remove attempt fails.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
     Remove(bluez::Error),
+
+    /// Happens when the user selects an invalid alias. This variant may only occur during the interactive mode.
+    ///
+    /// The selection is invalid when:
+    ///
+    /// - User enters an index which does not exist on the list.
+    /// - User enters something other than the provided indexes.
     InvalidAlias,
+
+    /// Happens when the connected devices could not be read. This variant may only occur during the interactive mode.
+    /// It holds the underlying [`bluez::Error`] error.
+    ///
+    /// [`bluez::Error`]: crate::bluez::Error
     ConnectedDevices(bluez::Error),
+
+    /// Happens when there are no connected devices on the host to disconnect from. This variant may only occur during the interactive mode.
     NoConnectedDevices,
+
+    /// Happens when [`disconnect`] cannot write to the provided [`io::Write`] or cannot read from the provided [`io::BufRead`].
+    ///
+    /// It holds the underlying [`io::Error`].
+    ///
+    /// [`disconnect`]: crate::disconnect
+    /// [`io::Error`]: std::io::Error
     Io(io::Error),
 }
 
@@ -79,6 +112,195 @@ impl TableFormattable<DisconnectColumn> for (&usize, &bluez::Device) {
     }
 }
 
+/// Provides the ability of disconnecting from a connected device by using a [`BluezClient`].
+///
+/// [`disconnect`] has **interactive** and **non-interactive** modes and they are based on the provided `aliases`.
+///
+/// # Interactive Mode
+///
+/// [`disconnect`] runs interactively if `aliases` is [`None`].
+///
+/// In this mode, [`disconnect`] fetches the connected devices first to find out the device to disconnect from.
+///
+/// When the devices are fetched, a list is written to the provided [`io::Write`]. The written list is in pretty format (is a table) and has the same columns as what [`connect`] provides except the RSSI column. Like [`connect`], the columns are not customizable.
+///
+/// The selected IDX of a connected device is read from the provided [`io::BufRead`].
+///
+/// Here is how the table of connected devices looks like:
+///
+/// ```txt
+/// IDX    ALIAS   ADDRESS          
+/// (0)    Dev1    XX:XX:XX:XX:XX:XX
+/// (1)    Dev2    XX:XX:XX:XX:XX:XX
+/// (2)    Dev3    XX:XX:XX:XX:XX:XX
+/// ```
+///
+/// Once an IDX is selected, [`disconnect`] tries to disconnect from that device by using a [`BluezClient`].
+/// Upon disconnecting, [`disconnect`] writes a message to the provided [`io::Write`].
+///
+/// # Non-Interactive Mode
+///
+/// [`disconnect`] runs non-interactively if `aliases` is [`Some`].
+///
+/// In this mode, [`disconnect`] does NOT fetch the connected devices and tries to disconnect from each device through their aliases defined in `aliases`.
+///
+/// Upon disconnecting, [`disconnect`] writes a messages to the provided [`io::Write`].
+///
+/// Both modes can be used depending on how convenient defining the `aliases` is.
+///
+/// In order to see the connected devices, [`list_devices`] or [`status`] can be used.
+///
+/// # Removing a device
+///
+/// [`disconnect`] also provides the ability to remove a device completely based on whether `force` is true or not.
+///
+/// If `force` is `true`, then both interactive and non-interactive mode results in removing the device from the known devices list on the host.
+///
+/// If `force` is `false`, the both interactive and non-interactive mode results in disconnecting from the device. The device will be kept in the known device list.
+///
+/// `force` does not change the behavior of interactive and non-interactive mode explained above.
+///
+/// # Panics
+///
+/// This function does not panic.
+///
+/// # Errors
+///
+/// This function can return all variants of [`DisconnectError`] based on given conditions. For more details, please see the error documentation.
+///
+/// # Examples
+///
+/// Here is an example for an interactive [`disconnect`]. `force` is `false`, so [`disconnect`] does not remove the device.
+///
+/// ```no_run
+/// use std::io;
+/// use bt::{disconnect, BluezClient};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = io::stdin();
+/// let mut output = io::stdout();
+///
+/// let force = false;
+/// let aliases = None;
+///
+/// // Before returning `disconnect_result`, [`disconnect`] writes the list of connected devices to `output`.
+/// // The selection will be read from `input`.
+/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// match disconnect_result {
+///     Ok(_) => {
+///          // `output` contains the success message.
+///          // ...
+///     },
+///     Err(e) => eprintln!("disconnect error: {}", e)
+/// }
+///```
+///
+/// In order to remove a connected device, use `force`.
+///
+///```no_run
+/// use std::io;
+/// use bt::{disconnect, BluezClient};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = io::stdin();
+/// let mut output = io::stdout();
+///
+/// let force = true;
+/// let aliases = None;
+///
+/// // Before returning `disconnect_result`, [`disconnect`] writes the list of connected devices to `output`.
+/// // The selection will be read from `input`.
+/// let disconnect_result = connect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// match disconnect_result {
+///     Ok(_) => {
+///          // `output` contains the success message.
+///          // ...
+///     },
+///     Err(e) => eprintln!("connect error: {}", e)
+/// }
+/// ```
+///
+/// Here is an example for a non-interactive [`disconnect`]. In this example, `aliases` is set to a vector which holds the ALIAS of the connected device.
+///
+///```no_run
+/// use std::io;
+/// use bt::{disconnect, BluezClient};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = io::stdin();
+/// let mut output = io::stdout();
+///
+/// let force = false;
+/// let aliases = Some(vec!["connected_dev".to_string()]);
+///
+/// // `disconnect` tries to disconnect from the device that has the alias "connected_dev".
+/// // It will not show the connected devices.
+/// // `output` is only used to provide the success message.
+/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// match disconnect_result {
+///     Ok(_) => {
+///          // `output` contains the success message.
+///          // ...
+///     },
+///     Err(e) => eprintln!("disconnect error: {}", e)
+/// }
+/// ```
+///
+/// In order to remove a device in the non-interactive mode, use `force` just as we did in the interactive mode.
+///
+///```no_run
+/// use std::io;
+/// use bt::{disconnect, BluezClient};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = io::stdin();
+/// let mut output = io::stdout();
+///
+/// let force = true;
+/// let aliases = Some(vec!["connected_dev".to_string()]);
+///
+/// // `disconnect` tries to remove the device that has the alias "connected_dev".
+/// // It will not show the connected devices.
+/// // `output` is only used to provide the success message.
+/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// match disconnect_result {
+///     Ok(_) => {
+///          // `output` contains the success message.
+///          // ...
+///     },
+///     Err(e) => eprintln!("disconnect error: {}", e)
+/// }
+/// ```
+///
+/// Here is an error case. The example triggers an [`io::Error`] by passing an array as a buffer, instead of a growable buffer.
+///
+/// ```no_run
+/// use std::io::Cursor;
+/// use bt::{disconnect, BluezClient, DisconnectError};
+///
+/// let bluez_client = BluezClient::new().unwrap();
+/// let mut input = Cursor::new([]);
+/// let mut output = Cursor::new([]);
+///
+/// let force = false;
+/// let aliases = None;
+///
+/// let disconnect_result = disconnect(&bluez_client, &mut output, &mut input, &force, &aliases);
+/// match disconnect_result {
+///     Err(DisconnectError::Io(err)) => eprintln!("{}", err),
+///     _ => unreachable!(),
+/// }
+///```
+/// [`BluezClient`]: crate::BluezClient
+/// [`io::Write`]: std::io::Write
+/// [`io::BufRead`]: std::io::BufRead
+/// [`Some`]: std::option::Option::Some
+/// [`None`]: std::option::Option::None
+/// [`DisconnectError`]: crate::DisconnectError
+/// [`disconnect`]: crate::disconnect
+/// [`connect`]: crate::connect
+/// [`list_devices`]: crate::list_devices
+/// [`status`]: crate::status
 pub fn disconnect(
     bluez: &crate::BluezClient,
     w: &mut impl io::Write,
