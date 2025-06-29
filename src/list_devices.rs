@@ -4,7 +4,7 @@ use std::{error, io};
 use clap::{Args, arg};
 
 use crate::{
-    bluez,
+    BluezError, bluez,
     format::{PrettyFormatter, TableFormattable, TerseFormatter},
 };
 
@@ -13,11 +13,12 @@ use crate::{
 /// [`list_devices`]: crate::list_devices
 #[derive(Debug)]
 pub enum Error {
-    /// Happens when the known devices cannot be read.
-    /// It holds the underlying [`bluez::Error`] error.
+    /// Happens when the [`BluezClient`] fails during the process.
+    /// It holds the underlying [`BluezError`].
     ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    KnownDevices(bluez::Error),
+    /// [`BluezError`]: crate::BluezError
+    /// [`BluezClient`]: crate::BluezClient
+    Bluez(BluezError),
 
     /// Happens when [`list_devices`] cannot write to the provided [`io::Write`].
     ///
@@ -31,15 +32,21 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::KnownDevices(error) => {
-                write!(f, "unable to get known bluetooth devices: {}", error)
+            Error::Bluez(error) => {
+                write!(f, "list-devices: bluez error: {}", error)
             }
-            Error::Io(error) => write!(f, "io error: {}", error),
+            Error::Io(error) => write!(f, "list-devices: io error: {}", error),
         }
     }
 }
 
 impl error::Error for Error {}
+
+impl From<BluezError> for Error {
+    fn from(value: BluezError) -> Self {
+        Error::Bluez(value)
+    }
+}
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
@@ -305,7 +312,7 @@ pub fn list_devices(
         None => &DEFAULT_LISTING_COLUMNS.to_vec(),
     };
 
-    let devices = bluez.devices().map_err(Error::KnownDevices)?;
+    let devices = bluez.devices()?;
     let devices = devices.into_iter().filter(|d| match &args.status {
         Some(s) => d.filter_cell_value_by_status(s),
         None => true,

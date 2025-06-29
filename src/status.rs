@@ -1,21 +1,18 @@
 use std::{error, fmt, io};
 
-use crate::bluez;
+use crate::BluezError;
 
 /// Defines error variants that may be returned from a [`status`] call.
 ///
 /// [`status`]: crate::status
 #[derive(Debug)]
 pub enum Error {
-    /// Happens when the power state of the Bluetooth adapter could not be read.
-    /// It holds the underlying [`bluez::Error`] error.
+    /// Happens when the [`BluezClient`] fails during the process.
+    /// It holds the underlying [`BluezError`].
     ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    PowerState(bluez::Error),
-
-    /// Happens when the connected Bluetooth devices could not be read.
-    /// It holds the underlying DBus error.
-    ConnectedDevices(bluez::Error),
+    /// [`BluezError`]: crate::BluezError
+    /// [`BluezClient`]: crate::BluezClient
+    Bluez(BluezError),
 
     /// Happens when the result of [`status`] could not be written to the given buffer.
     /// It holds the underlying [`io::Error`].
@@ -28,18 +25,19 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            Error::PowerState(error) => {
-                write!(f, "unable to get device power state: {}", error)
-            }
-            Error::ConnectedDevices(error) => {
-                write!(f, "unable to get connected devices: {}", error)
-            }
-            Error::Io(error) => write!(f, "io error: {}", error),
+            Error::Io(error) => write!(f, "status: io error: {}", error),
+            Error::Bluez(error) => write!(f, "status: bluez error: {}", error),
         }
     }
 }
 
 impl error::Error for Error {}
+
+impl From<BluezError> for Error {
+    fn from(value: BluezError) -> Self {
+        Self::Bluez(value)
+    }
+}
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
@@ -112,8 +110,8 @@ impl From<io::Error> for Error {
 /// }
 ///```
 pub fn status(bluez: &crate::BluezClient, f: &mut impl io::Write) -> Result<(), Error> {
-    let power_state = bluez.power_state().map_err(Error::PowerState)?;
-    let connected_devs = bluez.connected_devices().map_err(Error::ConnectedDevices)?;
+    let power_state = bluez.power_state()?;
+    let connected_devs = bluez.connected_devices()?;
 
     let mut buf = [
         "bluetooth: ",

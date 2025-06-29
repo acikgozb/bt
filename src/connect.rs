@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, error, fmt, io, num::ParseIntError, thread, tim
 use clap::Args;
 
 use crate::{
+    BluezError,
     bluez::{self},
     format::{PrettyFormatter, TableFormattable},
 };
@@ -12,31 +13,12 @@ use crate::{
 /// [`connect`]: crate::connect
 #[derive(Debug)]
 pub enum Error {
-    /// Happens when [`BluezClient`] fails to start the scan. This variant may only occur during the interactive mode.
-    /// It holds the underlying [`bluez::Error`] error.
+    /// Happens when the [`BluezClient`] fails during the process.
+    /// It holds the underlying [`BluezError`].
     ///
-    /// [`bluez::Error`]: crate::bluez::Error
+    /// [`BluezError`]: crate::BluezError
     /// [`BluezClient`]: crate::BluezClient
-    StartDiscovery(bluez::Error),
-
-    /// Happens when the scanned devices could not be read. This variant may only occur during the interactive mode.
-    /// It holds the underlying [`bluez::Error`] error.
-    ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    DiscoveredDevices(bluez::Error),
-
-    /// Happens when [`BluezClient`] fails to stop the scan. This variant may only occur during the interactive mode.
-    /// It holds the underlying [`bluez::Error`] error.
-    ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    /// [`BluezClient`]: crate::BluezClient
-    StopDiscovery(bluez::Error),
-
-    /// Happens when the connection attempt fails.
-    /// It holds the underlying [`bluez::Error`] error.
-    ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    Connect(bluez::Error),
+    Bluez(BluezError),
 
     /// Happens when the user selects an invalid alias. This variant may only occur during the interactive mode.
     ///
@@ -58,25 +40,22 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::StartDiscovery(error) => {
-                write!(f, "unable to start device discovery: {}", error)
-            }
-            Error::DiscoveredDevices(error) => {
-                write!(f, "unable to get discovered devices: {}", error)
-            }
-            Error::StopDiscovery(error) => write!(f, "unable to stop device discovery: {}", error),
-            Error::Connect(error) => {
-                write!(f, "unable to connect to device: {}", error)
-            }
+            Error::Bluez(error) => write!(f, "connect: bluez error: {}", error),
             Error::InvalidAlias => {
-                write!(f, "the selected alias is not valid")
+                write!(f, "connect: the selected alias is not valid")
             }
-            Error::Io(error) => write!(f, "io error: {}", error),
+            Error::Io(error) => write!(f, "connect: io error: {}", error),
         }
     }
 }
 
 impl error::Error for Error {}
+
+impl From<BluezError> for Error {
+    fn from(value: BluezError) -> Self {
+        Self::Bluez(value)
+    }
+}
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
@@ -346,13 +325,13 @@ pub fn connect(
         ),
     };
 
-    bluez.connect(alias).map_err(Error::Connect)?;
+    bluez.connect(alias)?;
 
     let out_buf = format!("connected to device: {}", alias);
     w.write_all(out_buf.as_bytes())?;
 
     if did_scan {
-        bluez.stop_discovery().map_err(Error::StopDiscovery)?;
+        bluez.stop_discovery()?;
     }
 
     Ok(())
@@ -363,12 +342,12 @@ fn scan_devices(
     duration: &Option<u8>,
     contains_name: &Option<String>,
 ) -> Result<Vec<bluez::Device>, Error> {
-    bluez.start_discovery().map_err(Error::StartDiscovery)?;
+    bluez.start_discovery()?;
 
     let scan_duration = u64::from(duration.unwrap_or(5));
     thread::sleep(Duration::from_secs(scan_duration));
 
-    let scan_result = bluez.scanned_devices().map_err(Error::DiscoveredDevices)?;
+    let scan_result = bluez.scanned_devices()?;
     Ok(match contains_name {
         Some(name) => scan_result
             .into_iter()

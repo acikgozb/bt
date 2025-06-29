@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, error, fmt, io, num::ParseIntError};
 
 use crate::{
-    bluez,
+    BluezError, bluez,
     format::{PrettyFormatter, TableFormattable},
 };
 
@@ -10,17 +10,12 @@ use crate::{
 /// [`disconnect`]: crate::disconnect
 #[derive(Debug)]
 pub enum Error {
-    /// Happens when the disconnect attempt fails.
-    /// It holds the underlying [`bluez::Error`] error.
+    /// Happens when the [`BluezClient`] fails during a [`disconnect`] call.
+    /// It holds the underlying [`BluezError`].
     ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    Disconnect(bluez::Error),
-
-    /// Happens when the remove attempt fails.
-    /// It holds the underlying [`bluez::Error`] error.
-    ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    Remove(bluez::Error),
+    /// [`BluezError`]: crate::BluezError
+    /// [`BluezClient`]: crate::BluezClient
+    Bluez(BluezError),
 
     /// Happens when the user selects an invalid alias. This variant may only occur during the interactive mode.
     ///
@@ -29,12 +24,6 @@ pub enum Error {
     /// - User enters an index which does not exist on the list.
     /// - User enters something other than the provided indexes.
     InvalidAlias,
-
-    /// Happens when the connected devices could not be read. This variant may only occur during the interactive mode.
-    /// It holds the underlying [`bluez::Error`] error.
-    ///
-    /// [`bluez::Error`]: crate::bluez::Error
-    ConnectedDevices(bluez::Error),
 
     /// Happens when there are no connected devices on the host to disconnect from. This variant may only occur during the interactive mode.
     NoConnectedDevices,
@@ -51,19 +40,24 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Disconnect(error) => write!(f, "unable to disconnect: {}", error),
-            Error::Remove(error) => write!(f, "unable to remove: {}", error),
-            Error::InvalidAlias => write!(f, "the provided alias is invalid"),
-            Error::ConnectedDevices(error) => {
-                write!(f, "unable to get connected devices: {}", error)
-            }
-            Error::Io(error) => write!(f, "io error: {}", error),
-            Error::NoConnectedDevices => write!(f, "there are no connected devices to disconnect"),
+            Error::InvalidAlias => write!(f, "disconnect: the provided alias is invalid"),
+            Error::Io(error) => write!(f, "disconnect: io error: {}", error),
+            Error::NoConnectedDevices => write!(
+                f,
+                "disconnect: there are no connected devices to disconnect"
+            ),
+            Error::Bluez(error) => write!(f, "disconnect: bluez error: {}", error),
         }
     }
 }
 
 impl error::Error for Error {}
+
+impl From<BluezError> for Error {
+    fn from(value: BluezError) -> Self {
+        Error::Bluez(value)
+    }
+}
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
@@ -311,7 +305,7 @@ pub fn disconnect(
     let aliases = match aliases.as_ref() {
         Some(aliases) => aliases,
         None => &{
-            let devices = bluez.connected_devices().map_err(Error::ConnectedDevices)?;
+            let devices = bluez.connected_devices()?;
 
             get_aliases_from_user(w, r, devices)?
         },
@@ -321,10 +315,10 @@ pub fn disconnect(
         let alias = alias.trim();
 
         let disconnect_result = if *force {
-            bluez.remove(alias).map_err(Error::Remove)?;
+            bluez.remove(alias)?;
             format!("removed device {} (forced)\n", alias)
         } else {
-            bluez.disconnect(alias).map_err(Error::Disconnect)?;
+            bluez.disconnect(alias)?;
             format!("disconnected from device {}\n", alias)
         };
 
