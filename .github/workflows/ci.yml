@@ -1,0 +1,26 @@
+name: "bt - CI"
+run-name: bt- CI on ${{ github.ref }} @${{ github.actor }}
+
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  integrity_checks:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run clippy
+        run: |
+          ./exec lint
+        shell: bash
+
+      - name: Run all tests
+        run: |
+          ./exec test
+        shell: bash
+        env:
+          RUST_BACKTRACE: 1
