@@ -1,7 +1,7 @@
 mod client;
 mod proxies;
 
-pub use client::{BluezDev as Device, Error};
+pub use client::{BluezDevice, Error};
 
 #[cfg(not(test))]
 pub use client::BluezDBusClient as Client;

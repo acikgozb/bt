@@ -92,7 +92,7 @@ pub enum DeviceStatus {
     Paired,
 }
 
-impl TableFormattable<ListDevicesColumn> for bluez::Device {
+impl TableFormattable<ListDevicesColumn> for bluez::BluezDevice {
     fn get_cell_value_by_column(&self, column: &ListDevicesColumn) -> String {
         match column {
             ListDevicesColumn::Alias => self.alias().to_string(),
@@ -123,7 +123,7 @@ impl From<&ListDevicesColumn> for String {
 pub trait TableCellFilter {
     fn filter_cell_value_by_status(&self, key: &DeviceStatus) -> bool;
 }
-impl TableCellFilter for bluez::Device {
+impl TableCellFilter for bluez::BluezDevice {
     fn filter_cell_value_by_status(&self, key: &DeviceStatus) -> bool {
         match key {
             DeviceStatus::Connected => self.connected(),
